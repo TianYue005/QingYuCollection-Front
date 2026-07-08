@@ -103,6 +103,7 @@ function handlePost() {
 
 function handleMessages() {
   // TODO: 跳转消息页面或弹窗
+  router.push({ name: 'chat' })
 }
 
 function handleFeedback() {

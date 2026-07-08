@@ -10,6 +10,7 @@ const password = ref('')
 const rememberMe = ref(false)
 const isLoading = ref(false)
 const errorMsg = ref('')
+const errorVisible = ref(false)
 
 onMounted(() => {
   const savedAccount = localStorage.getItem('rememberedAccount')
@@ -19,26 +20,27 @@ onMounted(() => {
   }
 })
 
+function showError(msg: string) {
+  errorMsg.value = msg
+  errorVisible.value = true
+}
+
 const handleLogin = async () => {
-  errorMsg.value = ''
+  errorVisible.value = false
   if (!account.value || !password.value) return
   isLoading.value = true
   try {
     const result = await login({ account: account.value, password: password.value })
     if (result.code !== 1) {
-      errorMsg.value = result.msg || '登录失败，请检查账号和密码'
+      showError(result.msg || '登录失败，请检查账号和密码')
       return
     }
-    const token = result.data
+    // data 格式为 "token,用户名"
+    const [token, username] = (result.data || '').split(',')
     const storage = rememberMe.value ? localStorage : sessionStorage
-    storage.setItem('token', token)
-
-    // 从 JWT 中解码用户信息
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1] || ''))
-      storage.setItem('userInfo', JSON.stringify({ id: payload.userId, username: payload.sub }))
-    } catch {
-      // JWT 解码失败时忽略
+    storage.setItem('token', token as string)
+    if (username) {
+      storage.setItem('username', username as string)
     }
 
     if (rememberMe.value) {
@@ -48,7 +50,7 @@ const handleLogin = async () => {
     }
     router.push('/')
   } catch {
-    errorMsg.value = '登录失败，请检查账号和密码'
+    showError('登录失败，请检查账号和密码')
   } finally {
     isLoading.value = false
   }
@@ -145,14 +147,24 @@ const handleLogin = async () => {
             <span class="login-form__checkbox-label">记住我</span>
           </label>
 
-          <!-- 错误提示 -->
-          <p v-if="errorMsg" class="login-form__error">{{ errorMsg }}</p>
-
           <button type="submit" class="login-form__submit" :disabled="isLoading">
             <span v-if="!isLoading">登 录</span>
             <span v-else class="login-form__spinner" />
           </button>
         </form>
+
+        <!-- 错误提示对话框 -->
+        <el-dialog
+          v-model="errorVisible"
+          title="登录失败"
+          width="360px"
+          :close-on-click-modal="true"
+        >
+          <p class="error-dialog__msg">{{ errorMsg }}</p>
+          <template #footer>
+            <button class="error-dialog__btn" @click="errorVisible = false">确 定</button>
+          </template>
+        </el-dialog>
 
         <!-- 底部链接 -->
         <div class="login-card__footer">
@@ -443,5 +455,37 @@ const handleLogin = async () => {
   letter-spacing: -0.12px;
   color: var(--color-ink-muted-48);
   text-align: center;
+}
+
+/* ===== 错误对话框 ===== */
+.error-dialog__msg {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.47;
+  color: var(--color-ink);
+}
+
+.error-dialog__btn {
+  padding: 8px 32px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.47;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--rounded-pill);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.error-dialog__btn:hover {
+  background: var(--color-primary-focus);
+}
+
+.error-dialog__btn:active {
+  transform: scale(0.95);
 }
 </style>

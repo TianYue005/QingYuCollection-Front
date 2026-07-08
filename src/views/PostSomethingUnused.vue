@@ -1,21 +1,5 @@
 <template>
-  <!-- 导航按钮 -->
-  <div class="floating-buttons-container">
-    <FloatingButtons />
-  </div>
-  <!-- 横幅 -->
-  <div class="banner">
-    <div class="banner-inner">
-      <div class="banner-brand">
-        <img class="banner-logo" :src="logo" alt="青寓集" />
-        <span class="banner-name">青寓集</span>
-      </div>
-      <div class="banner-user" @click="onUserClick">
-        <span class="user-avatar">游</span>
-        <span class="user-name">游客</span>
-      </div>
-    </div>
-  </div>
+  <NavBanner />
   <!-- 发闲置表单 -->
   <div class="post-unused-page">
     <div class="page-container">
@@ -124,24 +108,19 @@
         </div>
 
         <!-- 提交按钮 -->
-        <button class="submit-btn" @click="handleSubmit">发布闲置</button>
+        <button class="submit-btn" :disabled="submitting" @click="handleSubmit">
+          {{ submitting ? '发布中...' : '发布闲置' }}
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import FloatingButtons from '@/components/FloatingButtons.vue'
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import logo from '@/assets/picture/logo.svg'
-import { useAuth } from '@/composables/useAuth'
-
-const { handleUserClick } = useAuth()
-
-function onUserClick() {
-  handleUserClick()
-}
+import NavBanner from '@/components/NavBanner.vue'
+import { uploadImages, addItem } from '@/api/item'
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const previewImages = ref<string[]>([])
@@ -154,6 +133,11 @@ const form = reactive({
   attributes: [] as string[],
   images: [] as File[],
 })
+
+type Submitting = {
+  value: boolean
+}
+
 // 触发文件上传
 const uploading = ref(false)
 function triggerUpload() {
@@ -243,7 +227,9 @@ function validateNumber(field: 'price' | 'originalPrice', e: Event) {
   form[field] = val
 }
 
-function handleSubmit() {
+const submitting = ref(false)
+
+async function handleSubmit() {
   if (previewImages.value.length === 0) {
     ElMessage.warning('请上传宝贝图片')
     return
@@ -256,90 +242,52 @@ function handleSubmit() {
     ElMessage.warning('请填写价格')
     return
   }
-  ElMessage.success('发布成功')
+
+  submitting.value = true
+  try {
+    // 第一步：上传图片，获取 OSS 链接
+    const uploadRes = await uploadImages(form.images)
+    if (uploadRes.code !== 1) {
+      ElMessage.error(uploadRes.msg || '图片上传失败')
+      return
+    }
+    const imageUrls: string[] = uploadRes.data
+
+    // 第二步：携带图片链接和商品信息提交
+    const addRes = await addItem({
+      image: imageUrls,
+      description: form.description.trim(),
+      price: Number(form.price),
+      originalPrice: Number(form.originalPrice) || 0,
+      specs: form.attributes,
+    })
+
+    if (addRes.code === 1) {
+      ElMessage.success(addRes.msg || '发布成功')
+      resetForm()
+    } else {
+      ElMessage.error(addRes.msg || '商品上架失败')
+    }
+  } catch {
+    ElMessage.error('发布失败，请稍后重试')
+  } finally {
+    submitting.value = false
+  }
+}
+
+function resetForm() {
+  form.description = ''
+  form.price = ''
+  form.originalPrice = ''
+  form.attributes = []
+  form.images = []
+  attrInput.value = ''
+  previewImages.value.forEach((url) => URL.revokeObjectURL(url))
+  previewImages.value = []
 }
 </script>
 
 <style scoped>
-/* ===== 横幅 ===== */
-.banner {
-  background: #ffffff;
-  padding: 0 32px;
-}
-
-.banner-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 64px;
-}
-
-.banner-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.banner-logo {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-}
-
-.banner-name {
-  font-family:
-    'SF Pro Display',
-    system-ui,
-    -apple-system,
-    sans-serif;
-  font-size: 21px;
-  font-weight: 600;
-  line-height: 1.19;
-  letter-spacing: 0.231px;
-  color: #1d1d1f;
-}
-
-.banner-user {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #0066cc;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family:
-    'SF Pro Text',
-    system-ui,
-    -apple-system,
-    sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.user-name {
-  font-family:
-    'SF Pro Text',
-    system-ui,
-    -apple-system,
-    sans-serif;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.43;
-  letter-spacing: -0.224px;
-  color: #1d1d1f;
-}
-
 /* ===== 页面主体 ===== */
 .post-unused-page {
   min-height: 100vh;
@@ -748,12 +696,9 @@ function handleSubmit() {
   transform: scale(0.95);
 }
 
-/* 浮动按钮容器 */
-.floating-buttons-container {
-  position: fixed;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 100;
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>

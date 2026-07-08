@@ -70,8 +70,9 @@
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElCarousel, ElCarouselItem } from 'element-plus'
+import { getItemById, type ItemVO } from '@/api/item'
 
 const route = useRoute()
 const itemId: string = route.params.id as string
@@ -97,6 +98,8 @@ const carouselItems = ref<string[]>([])
 const product = ref<ProductDetail>({} as ProductDetail)
 const sellerDetail = ref<SellerDetail>()
 const isFavorited = ref(false)
+const loading = ref(false)
+const notFound = ref(false)
 
 const toggleFavorite = () => {
   isFavorited.value = !isFavorited.value
@@ -120,6 +123,38 @@ const soldText = computed(() => {
 const goodRateText = computed(() => {
   const rate = sellerDetail.value?.sellerGoodRate ?? 0
   return `好评率 ${rate}%`
+})
+
+async function fetchItem() {
+  loading.value = true
+  notFound.value = false
+  try {
+    const res = await getItemById(itemId)
+    if (res.code === 1 && res.data) {
+      const item: ItemVO = res.data
+      product.value = {
+        productName: item.goodsDesc || '',
+        productDesc: item.goodsDesc || '',
+        price: item.price ?? 0,
+        originalPrice: item.originalPrice ?? 0,
+        productStatus: item.tags?.split(',')[0] ?? '',
+      }
+      // 从 tags 生成标签展示
+      if (item.tags) {
+        carouselItems.value = []
+      }
+    } else {
+      notFound.value = true
+    }
+  } catch {
+    notFound.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchItem()
 })
 </script>
 

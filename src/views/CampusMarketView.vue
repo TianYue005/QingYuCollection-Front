@@ -6,24 +6,21 @@
         <el-icon><Search /></el-icon>
         <input v-model="searchText" type="text" class="search-input" placeholder="搜索商品" />
       </div>
-      <!-- 猜你想搜 -->
-      <div class="search-suggestions">
-        <span class="suggestions-label">猜你想搜：</span>
-        <div class="suggestions-chips">
-          <span
-            v-for="(item, index) in suggestions"
-            :key="index"
-            class="suggestion-chip"
-            :class="{ 'chip-hovered': hoveredIndex === index }"
-            @click="searchText = item"
-            @mouseenter="onChipEnter(index)"
-            @mouseleave="onChipLeave"
-            >{{ item }}
-          </span>
+      <!-- 空状态 -->
+      <div v-if="!loading && productList.length === 0" class="empty-state">
+        <div class="empty-state__icon">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="8" y="12" width="48" height="40" rx="4" />
+            <circle cx="22" cy="28" r="4" />
+            <path d="M8 44l12-10 8 6 12-10 16 12" />
+          </svg>
         </div>
+        <p class="empty-state__title">暂无商品</p>
+        <p class="empty-state__desc">还没有人发布闲置，快去发布第一个吧</p>
       </div>
+
       <!-- 商品列表 -->
-      <div class="product-list-container">
+      <div v-else class="product-list-container">
         <div
           v-for="(item, index) in productList"
           :key="index"
@@ -53,57 +50,101 @@
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- 右侧悬浮固定按钮 -->
-  <div class="floating-buttons-container">
-    <FloatingButtons />
+      <!-- 加载更多 -->
+      <div v-if="productList.length > 0" class="load-more-wrapper">
+        <button class="load-more-btn" :disabled="loading || !hasMore" @click="loadMore">
+          <template v-if="loading">加载中...</template>
+          <template v-else-if="!hasMore">没有更多了</template>
+          <template v-else>加载更多</template>
+        </button>
+        <span class="load-more-count" v-if="total > 0">
+          已加载 {{ productList.length }} / {{ total }}
+        </span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
-import FloatingButtons from '@/components/FloatingButtons.vue'
+import { getItemsToPage, type GoodsVO } from '@/api/item'
 
 const router = useRouter()
-const goToItem = (id: string) => {
-  router.push({ name: 'item', params: { id } })
+const goToItem = (id: string | number) => {
+  router.push({ name: 'item', params: { id: String(id) } })
 }
 const searchText = ref('')
 
-const hoveredIndex = ref(-1)
-let hoverTimer: ReturnType<typeof setTimeout> | null = null
-
-function onChipEnter(index: number) {
-  hoverTimer = setTimeout(() => {
-    hoveredIndex.value = index
-  }, 300)
+interface ProductItem {
+  image: string
+  description: string
+  price: string
+  sellerProfilePicture: string
+  sellerNickname: string
+  originalPrice: string
+  creditScore: string
+  itemId: string
 }
 
-function onChipLeave() {
-  if (hoverTimer) {
-    clearTimeout(hoverTimer)
-    hoverTimer = null
+const productList = ref<ProductItem[]>([])
+const loading = ref(false)
+const page = ref(1)
+const pageSize = 10
+const total = ref(0)
+const hasMore = ref(true)
+
+function mapGoodsToProduct(goods: GoodsVO): ProductItem {
+  const firstImg = goods.imgList?.[0]?.imgUrl
+  return {
+    image: firstImg || 'https://picsum.photos/200/300',
+    description: goods.goodsDesc,
+    price: `¥${(goods.price ?? 0).toFixed(2)}`,
+    sellerProfilePicture: 'https://picsum.photos/50/50',
+    sellerNickname: '卖家昵称',
+    originalPrice: `¥${(goods.originalPrice ?? 0).toFixed(2)}`,
+    creditScore: '100',
+    itemId: String(goods.goodsId),
   }
-  hoveredIndex.value = -1
 }
 
-const suggestions = Array.from({ length: 8 }, () => '偏好数据')
+async function fetchPage(isLoadMore = false) {
+  if (loading.value) return
+  loading.value = true
+  try {
+    const res = await getItemsToPage({
+      pageNumber: page.value,
+      pageSize,
+    })
+    if (res.code === 1 && res.data) {
+      const { total: t, rows } = res.data
+      total.value = t
+      const mapped = rows.map(mapGoodsToProduct)
+      if (isLoadMore) {
+        productList.value.push(...mapped)
+      } else {
+        productList.value = mapped
+      }
+      hasMore.value = productList.value.length < t
+    }
+  } catch {
+    console.error('获取商品列表失败')
+  } finally {
+    loading.value = false
+  }
+}
 
-const productList = Array.from({ length: 10 }, () => ({
-  image: 'https://picsum.photos/200/300', //商品图片
-  description: '商品描述', //商品描述
-  price: '¥100.00', //商品价格
-  sellerProfilePicture: 'https://picsum.photos/50/50', //卖家头像
-  sellerNickname: '卖家昵称', //卖家昵称
-  originalPrice: '¥100.00', //原始价格
-  currentPrice: '¥90.00', //当前价格
-  creditScore: '100', //信用积分
-  itemId: '123456', //商品ID
-}))
+function loadMore() {
+  if (!hasMore.value || loading.value) return
+  page.value++
+  fetchPage(true)
+}
+
+onMounted(() => {
+  fetchPage()
+})
 </script>
 
 <style scoped>
@@ -166,60 +207,55 @@ const productList = Array.from({ length: 10 }, () => ({
   color: #7a7a7a;
 }
 
-.search-suggestions {
+/* ===== 空状态 ===== */
+.empty-state {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  width: 33.33%;
-  margin: 17px auto 0;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  text-align: center;
 }
 
-.suggestions-label {
-  flex-shrink: 0;
+.empty-state__icon {
+  width: 80px;
+  height: 80px;
+  color: #c0c0c0;
+  margin-bottom: 24px;
+}
+
+.empty-state__icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.empty-state__title {
+  font-family:
+    'SF Pro Display',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.19;
+  letter-spacing: 0.231px;
+  color: #1d1d1f;
+  margin: 0 0 8px;
+}
+
+.empty-state__desc {
   font-family:
     'SF Pro Text',
     system-ui,
     -apple-system,
     sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
-  line-height: 1.43;
-  letter-spacing: -0.224px;
+  line-height: 1.47;
+  letter-spacing: -0.374px;
   color: #7a7a7a;
-  padding-top: 5px;
-}
-
-.suggestions-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.suggestion-chip {
-  display: inline-block;
-  padding: 8px 15px;
-  font-family:
-    'SF Pro Text',
-    system-ui,
-    -apple-system,
-    sans-serif;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.29;
-  letter-spacing: -0.224px;
-  color: #333333;
-  background: #fafafc;
-  border-radius: 11px;
-  cursor: pointer;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-.chip-hovered {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin: 0;
 }
 
 .product-list-container {
@@ -373,5 +409,64 @@ const productList = Array.from({ length: 10 }, () => ({
   border-radius: 50%;
   object-fit: cover;
   display: block;
+}
+
+/* ===== 加载更多 ===== */
+.load-more-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 0;
+}
+
+.load-more-btn {
+  padding: 11px 48px;
+  font-family:
+    'SF Pro Text',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.47;
+  letter-spacing: -0.374px;
+  color: #0066cc;
+  background: transparent;
+  border: 1px solid #0066cc;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.1s ease;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background: #0066cc;
+  color: #ffffff;
+}
+
+.load-more-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: #7a7a7a;
+  border-color: #e0e0e0;
+}
+
+.load-more-count {
+  font-family:
+    'SF Pro Text',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.43;
+  letter-spacing: -0.224px;
+  color: #7a7a7a;
 }
 </style>

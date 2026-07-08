@@ -1,4 +1,5 @@
 import axios from 'axios'
+import router from '@/router'
 
 const api = axios.create({
   baseURL: '/api',
@@ -28,8 +29,20 @@ api.interceptors.response.use(
     return response.data
   },
   function (error) {
+    const status = error.response?.status
     const message = error.response?.data?.message || error.message || '请求失败'
     console.error('[API Error]', message)
+
+    // token 过期或未授权，清除登录态并跳转登录页
+    if (status === 401) {
+      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
+      // 避免在登录页重复跳转
+      if (router.currentRoute.value.name !== 'login') {
+        router.push({ name: 'login' })
+      }
+    }
+
     return Promise.reject(error)
   },
 )
