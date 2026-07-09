@@ -27,8 +27,8 @@ function showError(msg: string) {
 
 const handleLogin = async () => {
   errorVisible.value = false
-  if (!account.value || !password.value) return
-  isLoading.value = true
+  if (!account.value || !password.value) return //如果账号或密码为空，直接返回
+  isLoading.value = true//登录中
   try {
     const result = await login({ account: account.value, password: password.value })
     if (result.code !== 1) {
@@ -74,7 +74,7 @@ const handleLogin = async () => {
           <circle cx="12" cy="12" r="10" />
           <path d="M12 6v6l4 2" />
         </svg>
-        <span class="login-nav__title">青隅集 一站式校园服务</span>
+        <span class="login-nav__title">青寓集 一站式校园服务</span>
       </router-link>
     </nav>
 
@@ -84,7 +84,7 @@ const handleLogin = async () => {
         <!-- 标题区 -->
         <div class="login-card__header">
           <h1 class="login-card__title">登录</h1>
-          <p class="login-card__subtitle">欢迎回到青隅集</p>
+          <p class="login-card__subtitle">欢迎回到青寓集</p>
         </div>
 
         <!-- 表单 -->

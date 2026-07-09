@@ -4,7 +4,16 @@
       <!-- 搜索框 -->
       <div class="search-box">
         <el-icon><Search /></el-icon>
-        <input v-model="searchText" type="text" class="search-input" placeholder="搜索商品" />
+        <input
+          v-model="searchText"
+          type="text"
+          class="search-input"
+          placeholder="搜索商品"
+          @keyup.enter="handleSearch"
+        />
+        <span v-if="searchText" class="search-clear" @click="handleClear">
+          <el-icon><Close /></el-icon>
+        </span>
       </div>
       <!-- 空状态 -->
       <div v-if="!loading && productList.length === 0" class="empty-state">
@@ -15,19 +24,25 @@
             <path d="M8 44l12-10 8 6 12-10 16 12" />
           </svg>
         </div>
-        <p class="empty-state__title">暂无商品</p>
-        <p class="empty-state__desc">还没有人发布闲置，快去发布第一个吧</p>
+        <p class="empty-state__title">{{ searchMode ? '未找到相关商品' : '暂无商品' }}</p>
+        <p class="empty-state__desc">
+          {{ searchMode ? '换个关键词试试吧' : '还没有人发布闲置，快去发布第一个吧' }}
+        </p>
       </div>
 
-      <!-- 商品列表 -->
-      <div v-else class="product-list-container">
+      <!-- 商品列表：瀑布流 -->
+      <div v-else class="waterfall-container">
         <div
-          v-for="(item, index) in productList"
-          :key="index"
+          v-for="item in productList"
+          :key="item.itemId"
           class="product-item"
           @click="goToItem(item.itemId)"
         >
-          <img :src="item.image" alt="商品图片" />
+          <img
+            :src="item.image"
+            alt="商品图片"
+            :style="{ aspectRatio: item.imgWidth + '/' + item.imgHeight }"
+          />
           <div class="product-name">{{ item.description }}</div>
           <!-- 商品描述 -->
           <div class="item-footer">
@@ -51,35 +66,41 @@
         </div>
       </div>
 
-      <!-- 加载更多 -->
-      <div v-if="productList.length > 0" class="load-more-wrapper">
-        <button class="load-more-btn" :disabled="loading || !hasMore" @click="loadMore">
-          <template v-if="loading">加载中...</template>
-          <template v-else-if="!hasMore">没有更多了</template>
-          <template v-else>加载更多</template>
-        </button>
-        <span class="load-more-count" v-if="total > 0">
-          已加载 {{ productList.length }} / {{ total }}
-        </span>
+      <!-- 底部状态 -->
+      <div v-if="productList.length > 0" class="bottom-status">
+        <!-- 加载动画 -->
+        <div v-if="hasMore" class="loading-dots">
+          <span class="dot" :style="{ animationDelay: '0s' }"></span>
+          <span class="dot" :style="{ animationDelay: '0.2s' }"></span>
+          <span class="dot" :style="{ animationDelay: '0.4s' }"></span>
+          <p class="loading-text">正在加载</p>
+        </div>
+        <!-- 没有更多 -->
+        <p v-else class="no-more-text">没有更多啦!</p>
       </div>
+      <!-- 滚动哨兵 -->
+      <div ref="sentinelRef" class="scroll-sentinel"></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search } from '@element-plus/icons-vue'
-import { getItemsToPage, type GoodsVO } from '@/api/item'
+import { Search, Close } from '@element-plus/icons-vue'
+import { getItemsToPage, searchItemsByKeyword, type GoodsVO } from '@/api/item'
 
 const router = useRouter()
-const goToItem = (id: string | number) => {
-  router.push({ name: 'item', params: { id: String(id) } })
+const goToItem = (id: string) => {
+  router.push({ name: 'item', params: { id } })
 }
 const searchText = ref('')
+const searchMode = ref(false)
 
 interface ProductItem {
   image: string
+  imgWidth: number
+  imgHeight: number
   description: string
   price: string
   sellerProfilePicture: string
@@ -97,16 +118,18 @@ const total = ref(0)
 const hasMore = ref(true)
 
 function mapGoodsToProduct(goods: GoodsVO): ProductItem {
-  const firstImg = goods.imgList?.[0]?.imgUrl
+  const firstImg = goods.imgList?.[0]
   return {
-    image: firstImg || 'https://picsum.photos/200/300',
+    image: firstImg?.imgUrl || 'https://picsum.photos/200/300',
+    imgWidth: firstImg?.imgWidth || 200,
+    imgHeight: firstImg?.imgHeight || 300,
     description: goods.goodsDesc,
     price: `¥${(goods.price ?? 0).toFixed(2)}`,
     sellerProfilePicture: 'https://picsum.photos/50/50',
-    sellerNickname: '卖家昵称',
+    sellerNickname: goods.userName || '匿名用户',
     originalPrice: `¥${(goods.originalPrice ?? 0).toFixed(2)}`,
     creditScore: '100',
-    itemId: String(goods.goodsId),
+    itemId: goods.goodsId,
   }
 }
 
@@ -114,14 +137,21 @@ async function fetchPage(isLoadMore = false) {
   if (loading.value) return
   loading.value = true
   try {
-    const res = await getItemsToPage({
-      pageNumber: page.value,
-      pageSize,
-    })
+    const res = searchMode.value
+      ? await searchItemsByKeyword({
+          keyword: searchText.value.trim(),
+          pageNumber: page.value,
+          pageSize,
+        })
+      : await getItemsToPage({
+          pageNumber: page.value,
+          pageSize,
+        })
     if (res.code === 1 && res.data) {
       const { total: t, rows } = res.data
       total.value = t
-      const mapped = rows.map(mapGoodsToProduct)
+      const existingIds = new Set(productList.value.map((p) => p.itemId))
+      const mapped = rows.map(mapGoodsToProduct).filter((item) => !existingIds.has(item.itemId))
       if (isLoadMore) {
         productList.value.push(...mapped)
       } else {
@@ -136,14 +166,58 @@ async function fetchPage(isLoadMore = false) {
   }
 }
 
-function loadMore() {
-  if (!hasMore.value || loading.value) return
-  page.value++
-  fetchPage(true)
+function handleSearch() {
+  const keyword = searchText.value.trim()
+  if (!keyword) {
+    // 关键词为空，恢复普通浏览模式
+    handleClear()
+    return
+  }
+  searchMode.value = true
+  page.value = 1
+  productList.value = []
+  hasMore.value = true
+  fetchPage()
+}
+
+function handleClear() {
+  searchText.value = ''
+  searchMode.value = false
+  page.value = 1
+  productList.value = []
+  hasMore.value = true
+  fetchPage()
+}
+
+const sentinelRef = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+let lastFetchTime = 0
+const FETCH_DEBOUNCE_MS = 3000
+
+function setupObserver() {
+  if (!sentinelRef.value) return
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && hasMore.value && !loading.value) {
+        const now = Date.now()
+        if (now - lastFetchTime < FETCH_DEBOUNCE_MS) return
+        lastFetchTime = now
+        page.value++
+        fetchPage(true)
+      }
+    },
+    { rootMargin: '100px' },
+  )
+  observer.observe(sentinelRef.value)
 }
 
 onMounted(() => {
   fetchPage()
+  setupObserver()
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
 })
 </script>
 
@@ -207,6 +281,19 @@ onMounted(() => {
   color: #7a7a7a;
 }
 
+.search-clear {
+  flex-shrink: 0;
+  cursor: pointer;
+  color: #7a7a7a;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.search-clear:hover {
+  color: #1d1d1f;
+}
+
 /* ===== 空状态 ===== */
 .empty-state {
   display: flex;
@@ -258,14 +345,15 @@ onMounted(() => {
   margin: 0;
 }
 
-.product-list-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 24px;
+.waterfall-container {
+  column-count: 4;
+  column-gap: 24px;
   padding: 32px 0;
 }
 
 .product-item {
+  break-inside: avoid;
+  margin-bottom: 24px;
   background: #ffffff;
   border-radius: 18px;
   overflow: hidden;
@@ -283,9 +371,25 @@ onMounted(() => {
 
 .product-item img {
   width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
   display: block;
+}
+
+@media (max-width: 1200px) {
+  .waterfall-container {
+    column-count: 3;
+  }
+}
+
+@media (max-width: 900px) {
+  .waterfall-container {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 600px) {
+  .waterfall-container {
+    column-count: 1;
+  }
 }
 
 .product-name {
@@ -411,53 +515,34 @@ onMounted(() => {
   display: block;
 }
 
-/* ===== 加载更多 ===== */
-.load-more-wrapper {
+/* ===== 底部状态 ===== */
+.bottom-status {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
   padding: 32px 0;
 }
 
-.load-more-btn {
-  padding: 11px 48px;
-  font-family:
-    'SF Pro Text',
-    system-ui,
-    -apple-system,
-    sans-serif;
-  font-size: 17px;
-  font-weight: 400;
-  line-height: 1.47;
-  letter-spacing: -0.374px;
-  color: #0066cc;
-  background: transparent;
-  border: 1px solid #0066cc;
-  border-radius: 9999px;
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    transform 0.1s ease;
+.loading-dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.load-more-btn:hover:not(:disabled) {
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   background: #0066cc;
-  color: #ffffff;
+  animation: dotPulse 1.2s ease-in-out infinite;
 }
 
-.load-more-btn:active:not(:disabled) {
-  transform: scale(0.95);
-}
-
-.load-more-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  color: #7a7a7a;
-  border-color: #e0e0e0;
-}
-
-.load-more-count {
+.loading-text {
+  width: 100%;
+  text-align: center;
   font-family:
     'SF Pro Text',
     system-ui,
@@ -468,5 +553,38 @@ onMounted(() => {
   line-height: 1.43;
   letter-spacing: -0.224px;
   color: #7a7a7a;
+  margin: 8px 0 0 0;
+}
+
+@keyframes dotPulse {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.no-more-text {
+  font-family:
+    'SF Pro Text',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.43;
+  letter-spacing: -0.224px;
+  color: #7a7a7a;
+  margin: 0;
+}
+
+.scroll-sentinel {
+  height: 1px;
+  width: 100%;
 }
 </style>

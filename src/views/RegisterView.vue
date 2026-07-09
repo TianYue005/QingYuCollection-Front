@@ -67,7 +67,7 @@ const handleDialogConfirm = () => {
           <circle cx="12" cy="12" r="10" />
           <path d="M12 6v6l4 2" />
         </svg>
-        <span class="register-nav__title">青隅集 一站式校园服务</span>
+        <span class="register-nav__title">青寓集 一站式校园服务</span>
       </router-link>
     </nav>
 
@@ -77,7 +77,7 @@ const handleDialogConfirm = () => {
         <!-- 标题区 -->
         <div class="register-card__header">
           <h1 class="register-card__title">注册</h1>
-          <p class="register-card__subtitle">创建你的青隅集账户</p>
+          <p class="register-card__subtitle">创建你的青寓集账户</p>
         </div>
 
         <!-- 表单 -->
@@ -219,7 +219,7 @@ const handleDialogConfirm = () => {
               </svg>
             </div>
             <h2 class="dialog-title">注册成功</h2>
-            <p class="dialog-desc">欢迎加入青隅集，即将跳转至登录页</p>
+            <p class="dialog-desc">欢迎加入青寓集，即将跳转至登录页</p>
             <button class="dialog-btn" @click="handleDialogConfirm">前往登录</button>
           </div>
         </div>

@@ -108,6 +108,7 @@ function handleMessages() {
 
 function handleFeedback() {
   // TODO: 打开反馈表单
+  router.push({ name: 'feedback' })
 }
 
 function handleCustomerService() {

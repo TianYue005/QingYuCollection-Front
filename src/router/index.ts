@@ -62,6 +62,30 @@ const router = createRouter({
       ],
     },
     {
+      //用户的“我的” 点击用户头像或名字进行跳转
+      path: '/user/home',
+      name: 'user-home',
+      component: () => import('@/views/UserHomeView.vue'),
+      children: [
+        {
+          path: '',
+          name: 'user-page',
+          component: () => import('@/components/UserPage.vue'),
+        },
+        {
+          path: 'profile',
+          name: 'profile',
+          component: () => import('@/components/Profile.vue'),
+        },
+      ],
+    },
+    {
+      //反馈
+      path: '/feedback',
+      name: 'feedback',
+      component: () => import('@/views/FeedbackView.vue'),
+    },
+    {
       //其他路径
       path: '/:pathMatch(.*)*',
       redirect: '/home/campus-market',

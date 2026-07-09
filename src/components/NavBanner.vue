@@ -16,17 +16,20 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import logo from '@/assets/picture/logo.svg'
-import { useAuth } from '@/composables/useAuth'
+import { isLoggedIn, getUsername } from '@/composables/useAuth'
 
-const { handleUserClick } = useAuth()
+const router = useRouter()
 
-const displayName = computed(() => {
-  return localStorage.getItem('username') || sessionStorage.getItem('username') || '游客'
-})
+const displayName = computed(() => getUsername())
 
-function onUserClick() {
-  handleUserClick()
+const onUserClick = () => {
+  if (!isLoggedIn()) {
+    router.push({ name: 'login' })
+    return
+  }
+  router.push({ name: 'user-page' })
 }
 </script>
 
@@ -86,10 +89,6 @@ function onUserClick() {
 
 .banner-user:hover {
   opacity: 0.8;
-}
-
-.banner-user:active {
-  transform: scale(0.95);
 }
 
 .user-avatar {

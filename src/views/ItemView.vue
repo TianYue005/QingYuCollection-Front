@@ -1,70 +1,112 @@
 <template>
   <div class="page">
-    <div class="seller-card">
-      <div class="seller-card__avatar">
-        <img :src="sellerDetail?.sellerAvatar || ''" alt="卖家头像" />
-      </div>
-      <div class="seller-card__body">
-        <div class="seller-card__name">{{ sellerDetail?.sellerName }}</div>
-        <div class="seller-card__meta">
-          <span>{{ lastSeenText }}</span>
-          <span class="seller-card__separator" aria-hidden="true"></span>
-          <span>{{ registerText }}</span>
-          <span class="seller-card__separator" aria-hidden="true"></span>
-          <span>{{ soldText }}</span>
-          <span class="seller-card__separator" aria-hidden="true"></span>
-          <span>{{ goodRateText }}</span>
+    <!-- 加载中 -->
+    <div v-if="loading" class="status-box">
+      <p class="status-box__text">加载中...</p>
+    </div>
+
+    <!-- 商品不存在 -->
+    <div v-else-if="notFound" class="status-box">
+      <p class="status-box__text">商品不存在或已下架</p>
+    </div>
+
+    <template v-else>
+      <div class="seller-card">
+        <div class="seller-card__avatar">
+          <img :src="sellerDetail?.sellerAvatar || ''" alt="卖家头像" />
+        </div>
+        <div class="seller-card__body">
+          <div class="seller-card__name">{{ sellerDetail?.sellerName }}</div>
+          <div class="seller-card__meta">
+            <span>{{ lastSeenText }}</span>
+            <span class="seller-card__separator" aria-hidden="true"></span>
+            <span>{{ registerText }}</span>
+            <span class="seller-card__separator" aria-hidden="true"></span>
+            <span>{{ soldText }}</span>
+            <span class="seller-card__separator" aria-hidden="true"></span>
+            <span>{{ goodRateText }}</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="gallery">
-      <el-carousel height="375px" motion-blur>
-        <el-carousel-item v-for="url in carouselItems" :key="url">
-          <img :src="url" alt="" class="gallery__image" />
-        </el-carousel-item>
-      </el-carousel>
-    </div>
-
-    <div class="product-detail">
-      <h1 class="product-detail__name">{{ product?.productName }}</h1>
-
-      <div class="product-detail__price-row">
-        <span class="product-detail__price">&yen;{{ product?.price }}</span>
-        <span class="product-detail__original-price">&yen;{{ product?.originalPrice }}</span>
+      <div class="gallery">
+        <el-carousel height="375px" motion-blur>
+          <el-carousel-item v-for="url in carouselItems" :key="url">
+            <img :src="url" alt="" class="gallery__image" @click="openPreview(url)" />
+          </el-carousel-item>
+        </el-carousel>
       </div>
 
-      <span class="product-detail__condition">{{ product?.productStatus }}</span>
+      <div class="product-detail">
+        <div class="product-detail__price-row">
+          <span class="product-detail__price">&yen;{{ product?.price }}</span>
+          <span class="product-detail__original-price">&yen;{{ product?.originalPrice }}</span>
+        </div>
 
-      <p class="product-detail__desc">{{ product?.productDesc }}</p>
+        <span class="product-detail__condition">{{ product?.productStatus }}</span>
 
-      <div class="product-detail__actions">
-        <div class="product-detail__actions-row">
-          <button class="btn-chat">聊一聊</button>
-          <button
-            class="btn-favorite"
-            :class="{ 'is-favorited': isFavorited }"
-            @click="toggleFavorite"
-          >
+        <p class="product-detail__desc">{{ product?.productDesc }}</p>
+
+        <div class="product-detail__actions">
+          <div class="product-detail__actions-row">
+            <button class="btn-chat">聊一聊</button>
+            <button
+              class="btn-favorite"
+              :class="{ 'is-favorited': isFavorited }"
+              @click="toggleFavorite"
+            >
+              <svg
+                class="btn-favorite__icon"
+                viewBox="0 0 24 24"
+                :fill="isFavorited ? '#0066cc' : 'none'"
+                :stroke="isFavorited ? '#0066cc' : '#0066cc'"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                />
+              </svg>
+              <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
+            </button>
+          </div>
+          <button class="btn-buy">购买</button>
+        </div>
+      </div>
+
+      <!-- 图片预览模态框 -->
+      <Teleport to="body">
+        <div
+          v-if="previewVisible"
+          class="image-preview-overlay"
+          @mousedown="onPreviewOverlayMouseDown"
+          @wheel.prevent="onPreviewWheel"
+          @click.self="closePreview"
+        >
+          <button class="image-preview-close" @click="closePreview">
             <svg
-              class="btn-favorite__icon"
               viewBox="0 0 24 24"
-              :fill="isFavorited ? '#0066cc' : 'none'"
-              :stroke="isFavorited ? '#0066cc' : '#0066cc'"
+              fill="none"
+              stroke="currentColor"
               stroke-width="2"
               stroke-linecap="round"
-              stroke-linejoin="round"
             >
-              <path
-                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-              />
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
-            <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
           </button>
+          <img
+            :src="previewUrl"
+            alt=""
+            class="image-preview-img"
+            :style="previewImgStyle"
+            @mousedown.stop="onPreviewImgMouseDown"
+            @dragstart.prevent
+          />
         </div>
-        <button class="btn-buy">购买</button>
-      </div>
-    </div>
+      </Teleport>
+    </template>
   </div>
 </template>
 
@@ -72,7 +114,7 @@
 import { useRoute } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
 import { ElCarousel, ElCarouselItem } from 'element-plus'
-import { getItemById, type ItemVO } from '@/api/item'
+import { getItemById, type GoodsVO } from '@/api/item'
 
 const route = useRoute()
 const itemId: string = route.params.id as string
@@ -87,7 +129,6 @@ type SellerDetail = {
 }
 
 type ProductDetail = {
-  productName: string
   productDesc: string
   price: number
   originalPrice: number
@@ -100,6 +141,75 @@ const sellerDetail = ref<SellerDetail>()
 const isFavorited = ref(false)
 const loading = ref(false)
 const notFound = ref(false)
+const previewVisible = ref(false)
+const previewUrl = ref('')
+const previewScale = ref(1)
+const previewX = ref(0)
+const previewY = ref(0)
+const isDragging = ref(false)
+const dragStartX = ref(0)
+const dragStartY = ref(0)
+const dragOriginX = ref(0)
+const dragOriginY = ref(0)
+
+const previewImgStyle = computed(() => ({
+  transform: `translate(${previewX.value}px, ${previewY.value}px) scale(${previewScale.value})`,
+  cursor: isDragging.value ? 'grabbing' : 'grab',
+  transition: isDragging.value ? 'none' : 'transform 0.15s ease',
+}))
+
+function openPreview(url: string) {
+  previewUrl.value = url
+  previewScale.value = 1
+  previewX.value = 0
+  previewY.value = 0
+  previewVisible.value = true
+}
+
+function closePreview() {
+  previewVisible.value = false
+}
+
+function onPreviewWheel(e: WheelEvent) {
+  const delta = e.deltaY > 0 ? -0.1 : 0.1
+  const newScale = Math.min(Math.max(previewScale.value + delta, 0.3), 5)
+  // 以鼠标位置为中心缩放
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const mouseX = e.clientX - rect.left - rect.width / 2
+  const mouseY = e.clientY - rect.top - rect.height / 2
+  const ratio = newScale / previewScale.value
+  previewX.value = mouseX + ratio * (previewX.value - mouseX)
+  previewY.value = mouseY + ratio * (previewY.value - mouseY)
+  previewScale.value = newScale
+}
+
+function onPreviewImgMouseDown(e: MouseEvent) {
+  isDragging.value = true
+  dragStartX.value = e.clientX
+  dragStartY.value = e.clientY
+  dragOriginX.value = previewX.value
+  dragOriginY.value = previewY.value
+
+  const onMove = (ev: MouseEvent) => {
+    if (!isDragging.value) return
+    previewX.value = dragOriginX.value + (ev.clientX - dragStartX.value)
+    previewY.value = dragOriginY.value + (ev.clientY - dragStartY.value)
+  }
+  const onUp = () => {
+    isDragging.value = false
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
+function onPreviewOverlayMouseDown(e: MouseEvent) {
+  // 点击遮罩背景（非图片区域）时关闭
+  if (e.target === e.currentTarget) {
+    closePreview()
+  }
+}
 
 const toggleFavorite = () => {
   isFavorited.value = !isFavorited.value
@@ -131,18 +241,15 @@ async function fetchItem() {
   try {
     const res = await getItemById(itemId)
     if (res.code === 1 && res.data) {
-      const item: ItemVO = res.data
+      const item: GoodsVO = res.data
       product.value = {
-        productName: item.goodsDesc || '',
         productDesc: item.goodsDesc || '',
         price: item.price ?? 0,
         originalPrice: item.originalPrice ?? 0,
         productStatus: item.tags?.split(',')[0] ?? '',
       }
-      // 从 tags 生成标签展示
-      if (item.tags) {
-        carouselItems.value = []
-      }
+      // 从 imgList 填充轮播图
+      carouselItems.value = item.imgList?.map((img) => img.imgUrl) ?? []
     } else {
       notFound.value = true
     }
@@ -180,6 +287,23 @@ onMounted(() => {
     system-ui,
     -apple-system,
     sans-serif;
+}
+
+/* ==================== 状态提示 ==================== */
+
+.status-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+.status-box__text {
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.47;
+  letter-spacing: -0.374px;
+  color: #7a7a7a;
 }
 
 /* ==================== 卖家卡片 ==================== */
@@ -252,6 +376,7 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: pointer;
 }
 
 /* ==================== 商品详情 ==================== */
@@ -260,20 +385,6 @@ onMounted(() => {
   background: #ffffff;
   border-radius: 18px;
   padding: 32px;
-}
-
-.product-detail__name {
-  margin: 0 0 12px;
-  font-family:
-    'SF Pro Display',
-    system-ui,
-    -apple-system,
-    sans-serif;
-  font-size: 34px;
-  font-weight: 600;
-  line-height: 1.47;
-  letter-spacing: -0.374px;
-  color: #1d1d1f;
 }
 
 .product-detail__price-row {
@@ -407,5 +518,54 @@ onMounted(() => {
 
 .btn-buy:active {
   transform: scale(0.95);
+}
+
+/* ==================== 图片预览模态框 ==================== */
+
+.image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.image-preview-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 50%;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.image-preview-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+.image-preview-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.image-preview-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  will-change: transform;
 }
 </style>

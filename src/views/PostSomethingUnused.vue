@@ -18,7 +18,7 @@
             <input
               ref="fileInputRef"
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.gif,.bmp"
               multiple
               style="display: none"
               @change="handleFileChange"
@@ -26,6 +26,9 @@
             <div v-if="previewImages.length === 0" class="upload-placeholder">
               <span class="upload-icon">+</span>
               <span class="upload-text">上传图片</span>
+              <span class="upload-hint"
+                >支持 JPG / JPEG / PNG / GIF / BMP 格式，单张最大 5MB，最多 4 张</span
+              >
             </div>
             <div v-else class="preview-grid">
               <div v-for="(img, index) in previewImages" :key="index" class="preview-item">
@@ -172,9 +175,11 @@ function handleFileChange(e: Event) {
   Array.from(files)
     .slice(0, remainingSlots)
     .forEach((file) => {
-      // MIME 类型检查：只允许图片
-      if (!file.type.startsWith('image/')) {
-        ElMessage.warning(`${file.name} 不是图片文件，已跳过`)
+      // 格式检查：只允许 jpg / jpeg / png / gif / bmp
+      const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+      if (!allowedExts.includes(ext)) {
+        ElMessage.warning(`${file.name} 格式不支持，仅支持 JPG / JPEG / PNG / GIF / BMP，已跳过`)
         return
       }
 
@@ -245,17 +250,17 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    // 第一步：上传图片，获取 OSS 链接
+    // 第一步：上传图片，获取图片信息（含 url、width、height）
     const uploadRes = await uploadImages(form.images)
     if (uploadRes.code !== 1) {
       ElMessage.error(uploadRes.msg || '图片上传失败')
       return
     }
-    const imageUrls: string[] = uploadRes.data
+    const pictures = uploadRes.data
 
-    // 第二步：携带图片链接和商品信息提交
+    // 第二步：将图片信息（含 url、宽、高）与商品表单数据一同提交
     const addRes = await addItem({
-      image: imageUrls,
+      image: pictures,
       description: form.description.trim(),
       price: Number(form.price),
       originalPrice: Number(form.originalPrice) || 0,
@@ -401,6 +406,18 @@ function resetForm() {
   line-height: 1.43;
   letter-spacing: -0.224px;
   color: #7a7a7a;
+}
+
+.upload-hint {
+  font-family:
+    'SF Pro Text',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: #b0b0b0;
 }
 
 /* 预览网格 */

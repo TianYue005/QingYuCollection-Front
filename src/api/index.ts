@@ -1,5 +1,8 @@
 import axios from 'axios'
 import router from '@/router'
+import JSONbig from 'json-bigint'  
+
+const JSONParser = JSONbig({ storeAsString: true })
 
 const api = axios.create({
   baseURL: '/api',
@@ -7,6 +10,18 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  transformResponse: [
+    (data) => {
+      if (typeof data === 'string' && data.trim().length > 0) {
+        try {
+          return JSONParser.parse(data)
+        } catch {
+          return data
+        }
+      }
+      return data
+    },
+  ],
 })
 
 // 请求拦截器
