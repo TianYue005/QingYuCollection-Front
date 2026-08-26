@@ -100,6 +100,20 @@
   </div>
 </template>
 
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { getUsername, getAccount, getUserId } from '@/composables/useAuth'
+
+const username = ref(getUsername())
+const account = ref(getAccount())
+const userId = ref<number | null>(getUserId())
+const avatar = ref<string | null>(null)
+const status = ref(1)
+const level = ref(1)
+const credit = ref(100)
+const balance = ref(0)
+</script>
+
 <style scoped>
 /* ============================================
    Apple Design System — Profile Page

@@ -26,3 +26,13 @@ export const register = (data: RegisterParams) => {
 export const login = (data: LoginParams) => {
   return api.post<any, Result<string>>('/user/login', data)
 }
+
+export interface UserInfo {
+  id: number
+  username: string
+  account: string
+}
+
+export const getUserInfo = (id: number) => {
+  return api.get<any, Result<UserInfo>>(`/user/info/${id}`)
+}

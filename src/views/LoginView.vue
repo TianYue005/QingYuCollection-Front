@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { login } from '@/api/user'
+import { login, getUserInfo } from '@/api/user'
+import { setUserInfo, getUserId } from '@/composables/useAuth'
 
 const router = useRouter()
 
@@ -27,20 +28,35 @@ function showError(msg: string) {
 
 const handleLogin = async () => {
   errorVisible.value = false
-  if (!account.value || !password.value) return //如果账号或密码为空，直接返回
-  isLoading.value = true//登录中
+  if (!account.value || !password.value) return
+  isLoading.value = true
   try {
     const result = await login({ account: account.value, password: password.value })
     if (result.code !== 1) {
       showError(result.msg || '登录失败，请检查账号和密码')
       return
     }
-    // data 格式为 "token,用户名"
-    const [token, username] = (result.data || '').split(',')
+    const token = result.data as string
     const storage = rememberMe.value ? localStorage : sessionStorage
-    storage.setItem('token', token as string)
-    if (username) {
-      storage.setItem('username', username as string)
+    storage.setItem('token', token)
+
+    const userId = getUserId()
+    if (userId) {
+      try {
+        const userResult = await getUserInfo(userId)
+        if (userResult.code === 1 && userResult.data) {
+          setUserInfo(userResult.data.username, userResult.data.account)
+        } else {
+          storage.setItem('username', account.value)
+          storage.setItem('account', account.value)
+        }
+      } catch {
+        storage.setItem('username', account.value)
+        storage.setItem('account', account.value)
+      }
+    } else {
+      storage.setItem('username', account.value)
+      storage.setItem('account', account.value)
     }
 
     if (rememberMe.value) {
