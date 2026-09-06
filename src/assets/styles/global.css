@@ -25,6 +25,8 @@
   --color-surface-chip-translucent: #d2d2d7;
   --color-on-primary: #ffffff;
   --color-on-dark: #ffffff;
+  --color-success: #34c759;
+  --color-warning: #ff3b30;
 
   /* ---- Typography ---- */
   --font-display: 'Inter', 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;

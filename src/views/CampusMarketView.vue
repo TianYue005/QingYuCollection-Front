@@ -89,6 +89,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Close } from '@element-plus/icons-vue'
 import { getItemsToPage, searchItemsByKeyword, type GoodsVO } from '@/api/item'
+import { DEFAULT_AVATAR } from '@/utils/avatar'
 
 const router = useRouter()
 const goToItem = (id: string) => {
@@ -125,7 +126,7 @@ function mapGoodsToProduct(goods: GoodsVO): ProductItem {
     imgHeight: firstImg?.imgHeight || 300,
     description: goods.goodsDesc,
     price: `¥${(goods.price ?? 0).toFixed(2)}`,
-    sellerProfilePicture: 'https://picsum.photos/50/50',
+    sellerProfilePicture: DEFAULT_AVATAR,
     sellerNickname: goods.userName || '匿名用户',
     originalPrice: `¥${(goods.originalPrice ?? 0).toFixed(2)}`,
     creditScore: '100',

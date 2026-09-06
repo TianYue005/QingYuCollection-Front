@@ -1,86 +1,154 @@
 <template>
-  <NavBanner>
-    <template #nav>
-      <nav class="nav-links">
-        <router-link
-          class="nav-link"
-          :class="{ active: isActive('/home/campus-market') }"
-          to="/home/campus-market"
-          >校园市集</router-link
-        >
-        <router-link class="nav-link" :class="{ active: isActive('/home/tools') }" to="/home/tools"
-          >便捷工具</router-link
-        >
-        <router-link class="nav-link" :class="{ active: isActive('/home/forum') }" to="/home/forum"
-          >校园论坛</router-link
-        >
-      </nav>
+  <NavBanner />
+
+  <Suspense>
+    <template #default>
+      <router-view />
     </template>
-  </NavBanner>
-  <router-view />
+    <template #fallback>
+      <div class="skeleton-container" aria-hidden="true">
+        <div class="skeleton-header">
+          <div class="skeleton-bar skeleton-bar--short"></div>
+          <div class="skeleton-bar skeleton-bar--medium"></div>
+        </div>
+        <div class="skeleton-grid">
+          <div 
+            class="skeleton-card" 
+            v-for="itemKey in SKELETON_COUNT" 
+            :key="`sk-${itemKey}`"
+          >
+            <div class="skeleton-img"></div>
+            <div class="skeleton-bar skeleton-bar--full"></div>
+            <div class="skeleton-bar skeleton-bar--half"></div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </Suspense>
 </template>
 
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
 import NavBanner from '@/components/NavBanner.vue'
 
-const route = useRoute()
+const SKELETON_COUNT = 8
 
-function isActive(path: string): boolean {
-  return route.path.startsWith(path)
-}
 </script>
 
 <style scoped>
-.nav-links {
+/* ===== 高性能骨架屏样式 ===== */
+.skeleton-container {
+  width: 80%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 48px 0;
+}
+
+.skeleton-header {
   display: flex;
-  gap: 32px;
+  flex-direction: column;
   align-items: center;
-  margin-left: 24px;
+  gap: 12px;
+  margin-bottom: 48px;
 }
 
-.nav-link {
+/* 统一扫光背景，利用 transform: translateX 替代 background-position 避免重绘 */
+.skeleton-bar,
+.skeleton-img {
   position: relative;
-  font-family:
-    'SF Pro Text',
-    system-ui,
-    -apple-system,
-    sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-  color: #1d1d1f;
-  letter-spacing: -0.12px;
-  text-decoration: none;
-  cursor: pointer;
-  padding-bottom: 6px;
-  transition:
-    color 0.25s ease,
-    font-weight 0.25s ease;
+  overflow: hidden;
+  background-color: #e8e8ed;
 }
 
-.nav-link::after {
+.skeleton-bar::after,
+.skeleton-img::after {
   content: '';
   position: absolute;
-  left: 0;
+  top: 0;
+  right: 0;
   bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+.skeleton-bar {
+  height: 16px;
+  border-radius: 8px;
+}
+
+.skeleton-bar--short {
+  width: 33%;
+  max-width: 400px;
+  height: 44px;
+  border-radius: 22px;
+}
+
+.skeleton-bar--medium {
+  width: 24%;
+  max-width: 280px;
+  height: 16px;
+}
+
+.skeleton-bar--full {
   width: 100%;
-  height: 2px;
-  border-radius: 1px;
-  background: #0066cc;
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.nav-link:hover {
-  color: #0066cc;
+.skeleton-bar--half {
+  width: 60%;
 }
 
-.nav-link.active {
-  color: #0066cc;
+/* 改用 Grid 布局规避从 column-count 切换页面时的整页重排 */
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
 }
 
-.nav-link.active::after {
-  transform: scaleX(1);
+.skeleton-card {
+  background: #ffffff;
+  border-radius: 18px;
+  overflow: hidden;
+  padding-bottom: 17px;
+}
+
+.skeleton-img {
+  width: 100%;
+  height: 200px;
+  margin-bottom: 17px;
+}
+
+.skeleton-card .skeleton-bar {
+  margin: 8px 17px 0;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* 响应式断点适配 Grid */
+@media (max-width: 1200px) {
+  .skeleton-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .skeleton-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .skeleton-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
 }
 </style>

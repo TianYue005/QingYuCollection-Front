@@ -1,13 +1,8 @@
 <template>
   <div class="user-page">
     <div class="tab-bar">
-      <div
-        v-for="tab in tabs"
-        :key="tab.key"
-        class="tab-item"
-        :class="{ active: activeTab === tab.key }"
-        @click="switchTab(tab.key)"
-      >
+      <div v-for="tab in tabs" :key="tab.key" class="tab-item" :class="{ active: activeTab === tab.key }"
+        @click="switchTab(tab.key)">
         <span class="tab-label">{{ tab.label }}</span>
         <span class="tab-underline"></span>
       </div>
@@ -17,20 +12,33 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
-import router from '@/router'
-import { isLoggedIn } from '@/composables/useAuth'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+const route = useRoute()
+const router = useRouter()
 
 const tabs = [
   { key: 'treasure', label: '宝贝' },
-  { key: 'rust', label: '信用及评价' },
+  { key: 'rust', label: '评价' },
+  { key: 'pending', label: '待处理的交易' }
 ]
 
-const activeTab = ref('treasure')
+// 由当前路由名驱动 tab 高亮（名称与路由 name 一致）
+const activeTab = computed(() => {
+  const name = String(route.name ?? '')
+  return tabs.some((t) => t.key === name) ? name : 'treasure'
+})
 
 const switchTab = (key: string) => {
-  activeTab.value = key
   console.log(`点击了  ${tabs.find((t) => t.key === key)?.label}  按钮`)
+  if (key === 'treasure') {
+    router.push({ name: 'treasure' })
+  } else if (key === 'rust') {
+    router.push({ name: 'rust' })
+  } else if (key === 'pending') {
+    router.push({ name: 'pending' })
+  }
 }
 </script>
 <style scoped>

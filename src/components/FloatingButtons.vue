@@ -6,67 +6,35 @@
         <span>发闲置</span>
       </div>
       <div key="messages" class="floating-btn" @click="handleMessages">
-        <svg
-          viewBox="0 0 24 24"
-          class="floating-icon"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
+        <svg viewBox="0 0 24 24" class="floating-icon" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
         <span>消息</span>
       </div>
       <div key="feedback" class="floating-btn" @click="handleFeedback">
-        <svg
-          viewBox="0 0 24 24"
-          class="floating-icon"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
+        <svg viewBox="0 0 24 24" class="floating-icon" fill="none" stroke="currentColor" stroke-width="2">
           <path
-            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
-          />
+            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
         </svg>
         <span>反馈</span>
       </div>
       <div key="service" class="floating-btn" @click="handleCustomerService">
-        <svg
-          viewBox="0 0 24 24"
-          class="floating-icon"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
+        <svg viewBox="0 0 24 24" class="floating-icon" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
           <path
-            d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"
-          />
+            d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
         </svg>
         <span>客服</span>
       </div>
       <div key="home" class="floating-btn" @click="handleHome">
-        <svg
-          viewBox="0 0 24 24"
-          class="floating-icon"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
+        <svg viewBox="0 0 24 24" class="floating-icon" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
         <span>主页</span>
       </div>
       <div v-if="showBackTop" key="backTop" class="floating-btn" @click="handleBackToTop">
-        <svg
-          viewBox="0 0 24 24"
-          class="floating-icon"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
+        <svg viewBox="0 0 24 24" class="floating-icon" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m18 15-6-6-6 6" />
         </svg>
         <span>回顶部</span>
@@ -98,11 +66,10 @@ onBeforeUnmount(() => {
 })
 // 点击发闲置按钮跳转到发闲置页面
 function handlePost() {
-  router.push({ name: 'post-something-unusedused' })
+  router.push({ name: 'postSomethingUnusedused' })
 }
 
 function handleMessages() {
-  // TODO: 跳转消息页面或弹窗
   router.push({ name: 'chat' })
 }
 
@@ -116,7 +83,15 @@ function handleCustomerService() {
 }
 // 点击主页按钮跳转到校园市场页面
 function handleHome() {
-  router.push({ name: 'campus-market' })
+  if (window.location.pathname.startsWith('/home/campusMarket')) {
+    router.push({ name: 'campusMarket' })
+  } else if (window.location.pathname.startsWith('/home/tools')) {
+    router.push({ name: 'tools' })
+  } else if (window.location.pathname.startsWith('/home/forum/')) {
+    router.push({ name: 'forum' })
+  } else {
+    router.push({ name: 'campusMarket' })
+  }
 }
 // 点击回顶部按钮滚动到顶部
 function handleBackToTop() {
@@ -153,7 +128,7 @@ function handleBackToTop() {
   user-select: none;
 }
 
-.floating-btn + .floating-btn {
+.floating-btn+.floating-btn {
   margin-top: 8px;
 }
 
