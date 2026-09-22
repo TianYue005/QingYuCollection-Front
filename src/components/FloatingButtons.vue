@@ -80,6 +80,7 @@ function handleFeedback() {
 
 function handleCustomerService() {
   // TODO: 打开客服对话
+   router.push({ name: 'consumerServices' })
 }
 // 点击主页按钮跳转到校园市场页面
 function handleHome() {

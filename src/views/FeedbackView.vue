@@ -115,7 +115,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/utils/message'
 import { PictureFilled, Plus } from '@element-plus/icons-vue'
 import { uploadImages } from '@/api/item'
 import { addFeedback } from '@/api/feedback'
@@ -148,7 +148,7 @@ const uploading = ref(false)
 function triggerUpload() {
   if (uploading.value) return
   if (previewImages.value.length >= MAX_IMAGES) {
-    ElMessage.warning(`最多只能上传 ${MAX_IMAGES} 张截图`)
+    toast.warning(`最多只能上传 ${MAX_IMAGES} 张截图`)
     return
   }
   uploading.value = true
@@ -171,7 +171,7 @@ function handleFileChange(e: Event) {
 function processFiles(files: File[]) {
   const remaining = MAX_IMAGES - previewImages.value.length
   if (remaining <= 0) {
-    ElMessage.warning(`最多只能上传 ${MAX_IMAGES} 张截图`)
+    toast.warning(`最多只能上传 ${MAX_IMAGES} 张截图`)
     return
   }
 
@@ -179,7 +179,7 @@ function processFiles(files: File[]) {
     // 格式检查
     const ext = '.' + file.name.split('.').pop()?.toLowerCase()
     if (!ALLOWED_EXTS.includes(ext)) {
-      ElMessage.warning(
+      toast.warning(
         `${file.name} 格式不支持，仅支持 JPG / JPEG / PNG / APNG / GIF / BMP，已跳过`,
       )
       return
@@ -190,7 +190,7 @@ function processFiles(files: File[]) {
   })
 
   if (files.length > remaining) {
-    ElMessage.warning(`最多只能上传 ${MAX_IMAGES} 张截图，已自动截取前 ${remaining} 张`)
+    toast.warning(`最多只能上传 ${MAX_IMAGES} 张截图，已自动截取前 ${remaining} 张`)
   }
 }
 
@@ -256,7 +256,7 @@ function resetForm() {
 // 提交反馈
 async function handleSubmit() {
   if (!feedbackContent.value.trim()) {
-    ElMessage.warning('请填写反馈内容')
+    toast.warning('请填写反馈内容')
     return
   }
 
@@ -269,7 +269,7 @@ async function handleSubmit() {
     if (uploadedFiles.value.length > 0) {
       const uploadRes = await uploadImages(uploadedFiles.value)
       if (uploadRes.code !== 1 || !uploadRes.data) {
-        ElMessage.error(uploadRes.msg || '图片上传失败')
+        toast.error(uploadRes.msg || '图片上传失败')
         return
       }
       screenshotUrls = uploadRes.data.map((pic) => pic.url).join(',')
@@ -286,13 +286,13 @@ async function handleSubmit() {
 
     const res = await addFeedback(feedback)
     if (res.code === 1) {
-      ElMessage.success('感谢您的反馈！')
+      toast.success('感谢您的反馈！')
       resetForm()
     } else {
-      ElMessage.error(res.msg || '反馈提交失败')
+      toast.error(res.msg || '反馈提交失败')
     }
   } catch {
-    ElMessage.error('网络异常，请稍后重试')
+    toast.error('网络异常，请稍后重试')
   } finally {
     isSubmitting.value = false
   }

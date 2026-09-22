@@ -52,6 +52,29 @@ export interface GoodsVO {
   imgList: GoodsImage[]
 }
 
+/** 我已卖出的商品（与后端 /items/select/mySold 返回的 GoodsVO 对齐，只包含已完成交易的记录） */
+export interface SoldGoodsVO {
+  goodsId: string
+  userId?: number | string
+  goodsDesc?: string
+  price?: number | string
+  userName?: string
+  originalPrice?: number | string
+  tags?: string
+  /** 是否已收藏 */
+  favourite?: boolean
+  /** 简易图片展示：首图平铺字段 */
+  imgUrl?: string
+  imgWidth?: number
+  imgHeight?: number
+  /** 0 说明没有卖出，非 0 则卖给了该用户 id */
+  sold?: number | string
+  /** 交易是否完成（null 未完成） */
+  finished?: number | string
+  /** 是否有评价：1 为有，0 为无 */
+  hasEvaluate?: number | string
+}
+
 /** 分页结果 */
 export interface PageResult<T> {
   total: number
@@ -188,4 +211,54 @@ export const selectItemComment = (goodsId: number) => {
 /** 查看某条商品评论之前的所有互动（@PathVariable 评论 id） */
 export const selectItemCommentInteraction = (commentId: number) => {
   return api.get<any, Result<PageResult<CommentGoodsVO>>>(`/items/select/comment/item/${commentId}`)
+}
+
+/**
+ * 查询我已经卖出的商品（分页查询，仅查询功能）
+ * 注意：后端该控制器直接返回 PageResult，没有外层 Result(code/msg/data) 包装；
+ * 为兼容起见返回值类型同时声明为两种结构。
+ */
+export const getMySoldItems = (params: ItemQueryParam) => {
+  return api.get<any, Result<PageResult<SoldGoodsVO>> | PageResult<SoldGoodsVO>>(
+    '/items/select/mySold',
+    { params },
+  )
+}
+
+/**
+ * 查询我已经购买的商品（分页查询，仅查询功能）
+ * 注意：后端该控制器直接返回 PageResult，没有外层 Result(code/msg/data) 包装；
+ * 为兼容起见返回值类型同时声明为两种结构。
+ */
+export const getMyPurchasedItems = (params: ItemQueryParam) => {
+  return api.get<any, Result<PageResult<SoldGoodsVO>> | PageResult<SoldGoodsVO>>(
+    '/items/select/myPurchase',
+    { params },
+  )
+}
+
+/** 评价交易对方参数（与后端 EvaluateDTO 对齐） */
+export interface EvaluateDTO {
+  /** 商品 id */
+  goodsId: string | number
+  /** 评价内容 */
+  content: string
+  /** 评价分数（1-5） */
+  score: number
+}
+
+/**
+ * 评价交易对方（POST /items/evaluate）
+ * 仅交易双方且交易完成后可评价，score 超过 5 或非交易双方会被后端拒绝
+ */
+export const addEvaluate = (data: EvaluateDTO) => {
+  return api.post<any, Result<string>>('/items/evaluate', data)
+}
+
+/**
+ * 卖家评价买家（POST /items/evaluate/buyer）
+ * 后端根据当前用户身份自动判断被评价方，其余校验同买家评价卖家
+ */
+export const addEvaluateBuyer = (data: EvaluateDTO) => {
+  return api.post<any, Result<string>>('/items/evaluate/buyer', data)
 }

@@ -127,12 +127,13 @@
     </div>
 
     <div class="input-container">
-      <input
+      <textarea
+        ref="inputRef"
         v-model="inputText"
-        type="text"
+        rows="1"
         placeholder="请输入消息"
-        @keyup.enter="handleSend"
-      />
+        @keydown.enter.exact.prevent="handleSend"
+      ></textarea>
       <button :disabled="!inputText.trim()" @click="handleSend">发送</button>
     </div>
   </div>
@@ -195,6 +196,23 @@ const myUid = ref<string | null>(
 )
 const peerName = ref(typeof route.query.name === 'string' ? route.query.name : '')
 const inputText = ref('')
+/** 输入框 DOM：多行内容时按内容自适应高度（上限 MAX_INPUT_HEIGHT，超出则内部滚动） */
+const inputRef = ref<HTMLTextAreaElement | null>(null)
+/** 输入框最大高度（px），超过后不再增高，改为内部滚动，避免挤压消息列表 */
+const MAX_INPUT_HEIGHT = 360
+
+function autoResizeInput() {
+  const el = inputRef.value
+  if (!el) return
+  // 先归零再按 scrollHeight 计算，否则内容变少时高度不会回缩
+  el.style.height = 'auto'
+  const next = Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)
+  el.style.height = `${next}px`
+  el.style.overflowY = el.scrollHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden'
+}
+
+// 输入 / 清空（发送后）都重新计算高度
+watch(inputText, () => nextTick(autoResizeInput))
 const messages = ref<ChatMessage[]>([])
 const messageListRef = ref<HTMLElement | null>(null)
 /** 当前会话 id（发消息时必须带上，否则后端会话 id 错乱） */
@@ -1385,38 +1403,43 @@ watch(connected, (value) => {
 /* ========== 输入框区域 ========== */
 .input-container {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
   padding: 16px 24px;
   background-color: #ffffff;
   border-top: 1px solid #e5e5ea;
 }
 
-.input-container input {
+.input-container textarea {
   flex: 1;
-  height: 40px;
-  padding: 0 16px;
+  min-height: 132px;
+  max-height: 360px;
+  padding: 9px 16px;
+  box-sizing: border-box;
   font-family:
     'SF Pro Text',
     system-ui,
     -apple-system,
     sans-serif;
   font-size: 15px;
+  line-height: 1.4;
   color: #1d1d1f;
   background-color: #f5f5f7;
   border: 1px solid #e5e5ea;
   border-radius: 20px;
   outline: none;
+  resize: none;
+  overflow-y: hidden;
   transition:
     border-color 0.2s,
     background-color 0.2s;
 }
 
-.input-container input::placeholder {
+.input-container textarea::placeholder {
   color: #8e8e93;
 }
 
-.input-container input:focus {
+.input-container textarea:focus {
   background-color: #ffffff;
   border-color: #007aff;
 }

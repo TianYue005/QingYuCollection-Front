@@ -23,7 +23,6 @@
     "json-bigint": "^1.0.0",
     "pinia": "^3.0.4",
     "sockjs-client": "^1.6.1",
-    "vditor": "^3.11.2",
     "video.js": "^8.23.9",
     "vue": "^3.5.38",
     "vue-router": "^5.1.0"

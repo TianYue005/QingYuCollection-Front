@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { login, getUserInfo } from '@/api/user'
 import { setUserInfo, getUserId } from '@/composables/useAuth'
+import { toast } from '@/utils/message'
 
 const router = useRouter()
 
@@ -10,8 +11,6 @@ const account = ref('')
 const password = ref('')
 const rememberMe = ref(false)
 const isLoading = ref(false)
-const errorMsg = ref('')
-const errorVisible = ref(false)
 
 onMounted(() => {
   const savedAccount = localStorage.getItem('rememberedAccount')
@@ -21,19 +20,13 @@ onMounted(() => {
   }
 })
 
-function showError(msg: string) {
-  errorMsg.value = msg
-  errorVisible.value = true
-}
-
 const handleLogin = async () => {
-  errorVisible.value = false
   if (!account.value || !password.value) return
   isLoading.value = true
   try {
     const result = await login({ account: account.value, password: password.value })
     if (result.code !== 1) {
-      showError(result.msg || '登录失败，请检查账号和密码')
+      toast.error(result.msg || '登录失败，请检查账号和密码')
       return
     }
     const token = result.data as string
@@ -66,7 +59,7 @@ const handleLogin = async () => {
     }
     router.push('/')
   } catch {
-    showError('登录失败，请检查账号和密码')
+    toast.error('登录失败，请检查账号和密码')
   } finally {
     isLoading.value = false
   }
@@ -168,19 +161,6 @@ const handleLogin = async () => {
             <span v-else class="login-form__spinner" />
           </button>
         </form>
-
-        <!-- 错误提示对话框 -->
-        <el-dialog
-          v-model="errorVisible"
-          title="登录失败"
-          width="360px"
-          :close-on-click-modal="true"
-        >
-          <p class="error-dialog__msg">{{ errorMsg }}</p>
-          <template #footer>
-            <button class="error-dialog__btn" @click="errorVisible = false">确 定</button>
-          </template>
-        </el-dialog>
 
         <!-- 底部链接 -->
         <div class="login-card__footer">
@@ -471,37 +451,5 @@ const handleLogin = async () => {
   letter-spacing: -0.12px;
   color: var(--color-ink-muted-48);
   text-align: center;
-}
-
-/* ===== 错误对话框 ===== */
-.error-dialog__msg {
-  margin: 0;
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.47;
-  color: var(--color-ink);
-}
-
-.error-dialog__btn {
-  padding: 8px 32px;
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.47;
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border: none;
-  border-radius: var(--rounded-pill);
-  cursor: pointer;
-  transition: transform 0.1s ease;
-}
-
-.error-dialog__btn:hover {
-  background: var(--color-primary-focus);
-}
-
-.error-dialog__btn:active {
-  transform: scale(0.95);
 }
 </style>

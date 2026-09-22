@@ -121,7 +121,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/utils/message'
 import NavBanner from '@/components/NavBanner.vue'
 import { uploadImages, addItem } from '@/api/item'
 
@@ -164,7 +164,7 @@ function handleFileChange(e: Event) {
 
   // 检查当前已上传数量
   if (form.images.length >= MAX_FILES) {
-    ElMessage.warning(`最多只能上传 ${MAX_FILES} 张图片`)
+    toast.warning(`最多只能上传 ${MAX_FILES} 张图片`)
     target.value = ''
     return
   }
@@ -179,13 +179,13 @@ function handleFileChange(e: Event) {
       const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
       const ext = '.' + file.name.split('.').pop()?.toLowerCase()
       if (!allowedExts.includes(ext)) {
-        ElMessage.warning(`${file.name} 格式不支持，仅支持 JPG / JPEG / PNG / GIF / BMP，已跳过`)
+        toast.warning(`${file.name} 格式不支持，仅支持 JPG / JPEG / PNG / GIF / BMP，已跳过`)
         return
       }
 
       // 文件大小检查：限制单张 5MB
       if (file.size > MAX_FILE_SIZE) {
-        ElMessage.warning(`${file.name} 超过 5MB 限制，已跳过`)
+        toast.warning(`${file.name} 超过 5MB 限制，已跳过`)
         return
       }
 
@@ -195,7 +195,7 @@ function handleFileChange(e: Event) {
 
   // 如果还有剩余文件未处理，提示用户
   if (files.length > remainingSlots) {
-    ElMessage.warning(`最多只能上传 ${MAX_FILES} 张图片，已自动截取前 ${remainingSlots} 张`)
+    toast.warning(`最多只能上传 ${MAX_FILES} 张图片，已自动截取前 ${remainingSlots} 张`)
   }
 
   target.value = ''
@@ -236,15 +236,15 @@ const submitting = ref(false)
 
 async function handleSubmit() {
   if (previewImages.value.length === 0) {
-    ElMessage.warning('请上传宝贝图片')
+    toast.warning('请上传宝贝图片')
     return
   }
   if (!form.description.trim()) {
-    ElMessage.warning('请填写宝贝描述')
+    toast.warning('请填写宝贝描述')
     return
   }
   if (!form.price) {
-    ElMessage.warning('请填写价格')
+    toast.warning('请填写价格')
     return
   }
 
@@ -253,7 +253,7 @@ async function handleSubmit() {
     // 第一步：上传图片，获取图片信息（含 url、width、height）
     const uploadRes = await uploadImages(form.images)
     if (uploadRes.code !== 1) {
-      ElMessage.error(uploadRes.msg || '图片上传失败')
+      toast.error(uploadRes.msg || '图片上传失败')
       return
     }
     const pictures = uploadRes.data
@@ -268,13 +268,13 @@ async function handleSubmit() {
     })
 
     if (addRes.code === 1) {
-      ElMessage.success(addRes.msg || '发布成功')
+      toast.success(addRes.msg || '发布成功')
       resetForm()
     } else {
-      ElMessage.error(addRes.msg || '商品上架失败')
+      toast.error(addRes.msg || '商品上架失败')
     }
   } catch {
-    ElMessage.error('发布失败，请稍后重试')
+    toast.error('发布失败，请稍后重试')
   } finally {
     submitting.value = false
   }

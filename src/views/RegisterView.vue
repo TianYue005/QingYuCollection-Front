@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { register } from '@/api/user'
+import { toast } from '@/utils/message'
 
 const router = useRouter()
 
@@ -10,16 +11,12 @@ const account = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const isLoading = ref(false)
-const errorMsg = ref('')
-const showSuccessDialog = ref(false)
 
 const handleRegister = async () => {
-  errorMsg.value = ''
-
   if (!username.value || !account.value || !password.value || !confirmPassword.value) return
 
   if (password.value !== confirmPassword.value) {
-    errorMsg.value = '两次输入的密码不一致'
+    toast.warning('两次输入的密码不一致')
     return
   }
 
@@ -31,22 +28,18 @@ const handleRegister = async () => {
       password: password.value,
     })
     if (result.code !== 1) {
-      errorMsg.value = result.msg || '注册失败，请稍后重试'
+      toast.error(result.msg || '注册失败，请稍后重试')
       return
     }
-    showSuccessDialog.value = true
+    toast.success('注册成功，即将跳转至登录页')
+    router.push('/user/login')
   } catch (err: any) {
     console.error('[Register] 请求失败:', err)
     const msg = err?.response?.data?.msg || err?.response?.data?.message
-    errorMsg.value = msg || '注册失败，请稍后重试'
+    toast.error(msg || '注册失败，请稍后重试')
   } finally {
     isLoading.value = false
   }
-}
-
-const handleDialogConfirm = () => {
-  showSuccessDialog.value = false
-  router.push('/user/login')
 }
 </script>
 
@@ -184,9 +177,6 @@ const handleDialogConfirm = () => {
             </div>
           </div>
 
-          <!-- 错误提示 -->
-          <p v-if="errorMsg" class="register-form__error">{{ errorMsg }}</p>
-
           <button type="submit" class="register-form__submit" :disabled="isLoading">
             <span v-if="!isLoading">注 册</span>
             <span v-else class="register-form__spinner" />
@@ -200,31 +190,6 @@ const handleDialogConfirm = () => {
         </div>
       </div>
     </main>
-
-    <!-- 注册成功弹窗 -->
-    <Teleport to="body">
-      <Transition name="dialog">
-        <div v-if="showSuccessDialog" class="dialog-overlay" @click.self="handleDialogConfirm">
-          <div class="dialog-card">
-            <div class="dialog-icon">
-              <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="26" cy="26" r="26" fill="#34C759" />
-                <path
-                  d="M14 27l7 7 17-17"
-                  stroke="#fff"
-                  stroke-width="4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </div>
-            <h2 class="dialog-title">注册成功</h2>
-            <p class="dialog-desc">欢迎加入青寓集，即将跳转至登录页</p>
-            <button class="dialog-btn" @click="handleDialogConfirm">前往登录</button>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
   </div>
 </template>
 
@@ -381,17 +346,6 @@ const handleDialogConfirm = () => {
   color: var(--color-ink-muted-48);
 }
 
-/* ---- 错误提示 ---- */
-.register-form__error {
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.43;
-  color: #ff3b30;
-  text-align: center;
-  margin: 0;
-}
-
 /* ---- 注册按钮 (button-primary 风格) ---- */
 .register-form__submit {
   display: inline-flex;
@@ -486,109 +440,5 @@ const handleDialogConfirm = () => {
   letter-spacing: -0.12px;
   color: var(--color-ink-muted-48);
   text-align: center;
-}
-
-/* ===== 成功弹窗 ===== */
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-}
-
-.dialog-card {
-  width: 300px;
-  background: #fff;
-  border-radius: 20px;
-  padding: 36px 28px 28px;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-}
-
-.dialog-icon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 16px;
-}
-
-.dialog-title {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--color-ink);
-  margin: 0 0 8px;
-}
-
-.dialog-desc {
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--color-ink-muted-48);
-  margin: 0 0 24px;
-}
-
-.dialog-btn {
-  width: 100%;
-  height: 44px;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-family: var(--font-body);
-  font-size: 17px;
-  font-weight: 400;
-  border: none;
-  border-radius: var(--rounded-pill);
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    transform 0.12s ease;
-}
-
-.dialog-btn:hover {
-  background: var(--color-primary-focus);
-}
-
-.dialog-btn:active {
-  transform: scale(0.96);
-}
-
-/* ---- 弹窗过渡动画 ---- */
-.dialog-enter-active {
-  transition: opacity 0.3s ease;
-}
-.dialog-enter-active .dialog-card {
-  transition:
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-    opacity 0.3s ease;
-}
-
-.dialog-leave-active {
-  transition: opacity 0.2s ease;
-}
-.dialog-leave-active .dialog-card {
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
-}
-
-.dialog-enter-from {
-  opacity: 0;
-}
-.dialog-enter-from .dialog-card {
-  transform: scale(0.85);
-  opacity: 0;
-}
-
-.dialog-leave-to {
-  opacity: 0;
-}
-.dialog-leave-to .dialog-card {
-  transform: scale(0.9);
-  opacity: 0;
 }
 </style>

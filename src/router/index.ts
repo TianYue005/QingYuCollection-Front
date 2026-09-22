@@ -49,12 +49,6 @@ const router = createRouter({
           component: () => import('@/views/Picture2GIFView.vue'),
         },
         {
-          //MarkDown编辑器
-          path: 'tools/MdEditer',
-          name: 'MdEditer',
-          component: () => import('@/views/MdEditerView.vue'),
-        },
-        {
           //校园论坛
           path: 'forum',
           name: 'forum',
@@ -172,7 +166,7 @@ const router = createRouter({
             },
             {
               path:'pending',
-              name:'pending',
+              name:'pending',//待处理的交易
               component:() => import('@/views/PendingView.vue')
             }
           ]
@@ -196,6 +190,30 @@ const router = createRouter({
           path: 'mysBuy',
           name: 'mysBuy',
           component: () => import('@/views/MyBuyView.vue'),
+        },
+        {
+          //我创建的组团
+          path: 'teamUpMyCreate',
+          name: 'myTeamUpCreate',
+          component: () => import('@/views/MyTeamUpCreateView.vue'),
+        },
+        {
+          //我参与的组团
+          path: 'teamUpMyJoin',
+          name: 'myTeamUpJoin',
+          component: () => import('@/views/MyTeamUpJoinView.vue'),
+        },
+        {
+          //我创建的圈子（动态/任务/活动三合一）
+          path: 'circleMyCreate',
+          name: 'myCircleCreate',
+          component: () => import('@/views/CircleMyCreate.vue'),
+        },
+        {
+          //我参与的圈子
+          path: 'circleMyJoin',
+          name: 'myCircleJoin',
+          component: () => import('@/views/MyCircleJoinView.vue'),
         }
       ],
     },
@@ -204,6 +222,12 @@ const router = createRouter({
       path: '/feedback',
       name: 'feedback',
       component: () => import('@/views/FeedbackView.vue'),
+    },
+    {
+      //客服
+      path: '/consumerServices',
+      name: 'consumerServices',
+      component: () => import('@/views/consumerServicesViewiew.vue'),
     },
     {
       //其他路径

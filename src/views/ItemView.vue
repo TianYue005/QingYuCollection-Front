@@ -299,7 +299,8 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
-import { ElCarousel, ElCarouselItem, ElMessage } from 'element-plus'
+import { ElCarousel, ElCarouselItem } from 'element-plus'
+import { toast } from '@/utils/message'
 import { getItemById, addItemComment, selectItemComment, selectItemCommentInteraction, type GoodsVO, type CommentGoodsVO } from '@/api/item'
 import { toggleFavorite as toggleFavoriteApi, removeFavorite, createChatSession } from '@/api/user'
 import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
@@ -432,7 +433,7 @@ async function startChat(entry: 'item' | 'buy') {
   if (sellerId == null || sellerId === '') return
   // 不能和自己交易/聊天
   if (String(sellerId) === String(getUserId())) {
-    ElMessage.warning(entry === 'buy' ? '不能购买自己发布的商品' : '不能和自己聊天')
+    toast.warning(entry === 'buy' ? '不能购买自己发布的商品' : '不能和自己聊天')
     return
   }
   if (chatCreating.value) return
@@ -441,7 +442,7 @@ async function startChat(entry: 'item' | 'buy') {
     // 发起会话接口返回裸 sessionId 字符串，不包 Result
     const sessionId = await createChatSession(sellerId, itemId)
     if (sessionId == null || sessionId === '') {
-      ElMessage.error('发起会话失败，请稍后重试')
+      toast.error('发起会话失败，请稍后重试')
       return
     }
     // 乐观更新：把本次发起的会话写入 store，聊天页会话列表加载后自动插入，
@@ -467,7 +468,7 @@ async function startChat(entry: 'item' | 'buy') {
     })
   } catch (error) {
     console.error('发起会话失败:', error)
-    ElMessage.error('发起会话失败，请稍后重试')
+    toast.error('发起会话失败，请稍后重试')
   } finally {
     chatCreating.value = false
   }

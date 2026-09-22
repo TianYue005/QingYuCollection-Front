@@ -124,7 +124,29 @@ export const handleTradeRequest = (payload: {
   return api.post<any, unknown>('/websocket/tradeRequest/request', payload)
 }
 
-/** 待处理交易商品（对应后端 Pending 实体：查询当前用户发布的商品及首张图片） */
+/**
+ * 查询自己的操作码：POST /websocket/tradeRequest/myVerifyCode
+ * body（TradePairUp）：goodsId 商品 id 必填。
+ * 后端从 Redis 取当前用户针对该商品的验证码，不存在则生成并缓存 5 分钟，直接返回字符串。
+ */
+export const getMyVerifyCode = (goodsId: number | string) => {
+  return api.post<any, string>('/websocket/tradeRequest/myVerifyCode', { goodsId })
+}
+
+/**
+ * 提交对方的操作码：POST /websocket/tradeRequest/otherVerifyCode
+ * body（TradePairUp）：goodsId 商品 id、otherVerifyCode 填写的验证码、operate 固定为 1。
+ * 返回数字：1=自己先填、等待对方填写完成交易；2=交易完成；其他=交易过程发生错误。
+ */
+export const submitOtherVerifyCode = (payload: {
+  goodsId: number | string
+  otherVerifyCode: string
+  operate: number
+}) => {
+  return api.post<any, number>('/websocket/tradeRequest/otherVerifyCode', payload)
+}
+
+/** 待处理交易商品（对应后端 Pending 实体：查询当前用户已同意但未结束交易的商品） */
 export interface Pending {
   /** 商品 id（雪花 Long，可能被序列化为字符串） */
   goodsId: number | string
@@ -134,17 +156,15 @@ export interface Pending {
   price?: number | string
   /** 商品图片（只存储一张） */
   picture?: string
-  /** 是否售出：0 未售出，否则为买家用户 id（Long，可能为字符串） */
-  sold?: number | string
 }
 
 /**
- * 当前用户的待处理交易：GET /user/pending/{userId}
- * 传递该用户 id，返回该用户待处理的商品及商品信息。
+ * 当前用户的待处理交易：GET /api/user/pending/wait
+ * 后端根据登录 Token 从 UserContext 获取当前用户，无需前端传参。
  * 注意：该接口直接返回 Pending 数组（不包 Result）。
  */
-export const getUserPending = (userId: number | string) => {
-  return api.get<any, Pending[]>(`/user/pending/${userId}`)
+export const getUserPending = () => {
+  return api.get<any, Pending[]>('/user/pending/wait')
 }
 
 /** 分页结果（对应后端 PageResult<T>） */
@@ -178,13 +198,61 @@ export const removeFavorite = (id: string) => {
   return api.delete<any, Result<number>>(`/user/favouriteRM/${id}`)
 }
 
+/**
+ * 收藏列表项（与后端 /user/favourite 的 selectFavourite 返回对齐）
+ * 图片已通过 LEFT JOIN 只取第一张，并以 imgUrl/imgWidth/imgHeight 平铺字段下发（不含 imgList）
+ */
+export interface FavoriteItemVO {
+  goodsId: string
+  goodsDesc: string
+  price: number | string
+  originalPrice: number | string
+  imgUrl: string
+  imgWidth: number
+  imgHeight: number
+}
+
 /** 获取收藏列表（分页） */
 export const getFavoriteList = (params: {
   pageNumber?: number
   pageSize?: number
   sortRules?: string
 }) => {
-  return api.get<any, Result<{ total: number; rows: any[] }>>('/user/favourite', { params })
+  return api.get<any, Result<PageResult<FavoriteItemVO>>>('/user/favourite', { params })
+}
+
+/** 评价视图对象（对应后端 EvaluateVO） */
+export interface EvaluateVO {
+  id: number
+  /** 评价人 */
+  evaluatorId: number | string
+  evaluatorName: string
+  evaluatorAvatar: string
+  /** 被评价人 */
+  evaluatedId: number | string
+  evaluatedName: string
+  evaluatedAvatar: string
+  content: string
+  /** 评价分数 1-5 */
+  score: number
+  createTime: string
+  goodsId: number | string
+  goodsDesc: string
+  goodsImgUrl: string
+}
+
+/**
+ * 查看评价（自己对别人的 / 别人对自己的，分页）
+ * @param target 0=我评价别人的（默认） 1=别人评价我的
+ * @param trait  1=好评（score>=4） 2=差评（score<=3），不传为全部
+ */
+export const getReviewList = (params: {
+  target?: number
+  trait?: number
+  pageNumber?: number
+  pageSize?: number
+}) => {
+  return api.get<any, Result<PageResult<EvaluateVO>>>('/user/review', { params })
 }
 
 /** 账号基本信息 */

@@ -72,7 +72,7 @@
         <div class="stat-divider"></div>
         <div class="stat-item">
           <span class="stat-value stat-balance">{{ balance }}</span>
-          <span class="stat-label">用户金额</span>
+          <span class="stat-label">用户积分</span>
         </div>
       </div>
     </div>
@@ -258,7 +258,7 @@ import { reactive, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAccount } from '@/composables/useAuth'
 import { accountInfo, updatePassword, type UserAccountInfo } from '@/api/user'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/utils/message'
 import { resolveAvatar } from '@/utils/avatar'
 
 const router = useRouter()
@@ -303,23 +303,23 @@ onUnmounted(() => {
 
 const submitPasswordForm = async () => {
   if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-    ElMessage.error('新密码和确认密码不一致')
+    toast.error('新密码和确认密码不一致')
     return
   }
   try {
     const res = await updatePassword(passwordForm.newPassword)
     if (res.code === 1) {
-      ElMessage.success('密码修改成功')
+      toast.success('密码修改成功')
       passwordForm.oldPassword = ''
       passwordForm.newPassword = ''
       passwordForm.confirmPassword = ''
       handlePasswordChange.value = false
     } else {
-      ElMessage.error(res.msg || '密码修改失败')
+      toast.error(res.msg || '密码修改失败')
     }
   } catch (e) {
     console.error('修改密码失败：', e)
-    ElMessage.error('密码修改失败')
+    toast.error('密码修改失败')
   }
 }
 
@@ -335,7 +335,7 @@ const handleLogout = () => {
   sessionStorage.removeItem('account')
   sessionStorage.removeItem('userInfo')
   showLogoutConfirm.value = false
-  ElMessage.success('已退出登录')
+  toast.success('已退出登录')
   router.push({ name: 'login' })
 }
 

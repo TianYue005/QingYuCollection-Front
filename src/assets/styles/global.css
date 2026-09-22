@@ -27,6 +27,7 @@
   --color-on-dark: #ffffff;
   --color-success: #34c759;
   --color-warning: #ff3b30;
+  --color-caution: #ff9f0a;
 
   /* ---- Typography ---- */
   --font-display: 'Inter', 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -100,4 +101,54 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+/* ============================================================
+   Global Toast（全站统一提示：接口错误 / 表单提交成功）
+   遵循 resources/apple/DESIGN.md：
+   - 形态取自 {component.search-input}：canvas 白底 + hairline 描边 + {rounded.pill}
+   - 不使用投影（投影只留给产品图）
+   - 文案用 {typography.body}：17px / 400 / 1.47 / -0.374px
+   类名 app-message 由 src/utils/message.ts 统一挂载。
+   ============================================================ */
+.el-message.app-message {
+  /* 覆盖 Element Plus 变量，避免与其 .el-message--xxx 的样式比拼优先级 */
+  --el-message-bg-color: var(--color-canvas);
+  --el-message-border-color: var(--color-hairline);
+  --el-message-text-color: var(--color-ink);
+  --el-message-padding: 12px 20px;
+
+  max-width: min(560px, calc(100vw - 32px));
+  border-radius: var(--rounded-pill);
+  box-shadow: none;
+}
+
+.el-message.app-message .el-message__content {
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.47;
+  letter-spacing: -0.374px;
+}
+
+.el-message.app-message .el-message__icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* 只有状态图标带语义色，界面其余部分保持单一 Action Blue 强调色 */
+.el-message.app-message.el-message--success .el-message__icon {
+  color: var(--color-success);
+}
+
+.el-message.app-message.el-message--error .el-message__icon {
+  color: var(--color-warning);
+}
+
+.el-message.app-message.el-message--warning .el-message__icon {
+  color: var(--color-caution);
+}
+
+.el-message.app-message.el-message--info .el-message__icon {
+  color: var(--color-ink-muted-48);
 }

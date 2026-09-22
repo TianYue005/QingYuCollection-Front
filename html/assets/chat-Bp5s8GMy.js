@@ -1,0 +1,1 @@
+import{dt as e}from"./_plugin-vue_export-helper-CnpCWJ2f.js";import{Ot as t}from"./index-pAVlrIuP.js";var n=t(`chat`,()=>{let t=e(null),n=e(null),r=e(null);function i(e){t.value=e}function a(e){n.value=e}function o(e){r.value=e}return{ChatPartnerID:t,setChatPartnerID:i,PendingChat:n,setPendingChat:a,SentMessage:r,setSentMessage:o}});export{n as t};
