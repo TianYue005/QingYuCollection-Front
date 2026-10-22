@@ -14,7 +14,12 @@
           class="contact-item"
           @click="handleContactClick(item)"
         >
-          <img class="contact-avatar" :src="item.icon" alt="好友头像" />
+          <img
+            class="contact-avatar"
+            :src="item.icon"
+            alt="好友头像"
+            @click.stop="goUserDetail(item.toUid)"
+          />
           <div class="contact-info">
             <div class="contact-top">
               <span class="contact-name">{{ item.name }}</span>
@@ -211,6 +216,12 @@ const handleContactClick = (item: messageSelect) => {
     params: { chatId: item.sessionId },
     query: { toUid: item.toUid, name: item.name },
   })
+}
+
+/** 点击好友头像：跳转到该用户的详情页（toUid 即对方用户 id） */
+const goUserDetail = (userId: number | string) => {
+  if (userId == null || userId === '') return
+  router.push({ name: 'UserDatail', params: { userId: String(userId) } })
 }
 
 </script>

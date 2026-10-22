@@ -20,7 +20,7 @@
                     {{ expandedId === value.id ? '收起评论' : '评论' }}
                 </button>
             </div>
-            <CircleComment v-if="expandedId === value.id" :circle-id="value.id" />
+            <CircleComment v-if="expandedId === value.id" :circle-id="value.id" @click.stop />
         </div>
     </div>
     <!-- 跑腿任务 -->
@@ -52,7 +52,7 @@
                     {{ expandedId === value.id ? '收起评论' : '评论' }}
                 </button>
             </div>
-            <CircleComment v-if="expandedId === value.id" :circle-id="value.id" />
+            <CircleComment v-if="expandedId === value.id" :circle-id="value.id" @click.stop />
         </div>
     </div>
     <!-- 加载更多 -->

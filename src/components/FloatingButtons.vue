@@ -86,8 +86,8 @@ function handleCustomerService() {
 function handleHome() {
   if (window.location.pathname.startsWith('/home/campusMarket')) {
     router.push({ name: 'campusMarket' })
-  } else if (window.location.pathname.startsWith('/home/tools')) {
-    router.push({ name: 'tools' })
+  } else if (window.location.pathname.startsWith('/home/points')) {
+    router.push({ name: 'pointsCenter' })
   } else if (window.location.pathname.startsWith('/home/forum/')) {
     router.push({ name: 'forum' })
   } else {

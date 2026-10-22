@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import TreasureView from '@/views/TreasureView.vue'
-import HandyToolsView from '@/views/HandyToolsView.vue'
+import PointsCenterView from '@/views/PointsCenterView.vue'
 import ForumView from '@/views/ForumView.vue'
 import CampusMarketView from '@/views/CampusMarketView.vue'
 const router = createRouter({
@@ -31,22 +31,10 @@ const router = createRouter({
           component: CampusMarketView,
         },
         {
-          //便捷工具
-          path: 'tools',
-          name: 'tools',
-          component: HandyToolsView,
-        },
-        {
-          //视频工具
-          path: 'tools/VideoStitching',
-          name: 'VideoStitching',
-          component: () => import('@/views/VideoStitchingView.vue'),
-        },
-        {
-          //图片转GIF
-          path: 'tools/Picture2GIFView',
-          name: 'Picture2GIFView',
-          component: () => import('@/views/Picture2GIFView.vue'),
+          //积分中心
+          path: 'points',
+          name: 'pointsCenter',
+          component: PointsCenterView,
         },
         {
           //校园论坛
@@ -230,9 +218,15 @@ const router = createRouter({
       component: () => import('@/views/consumerServicesViewiew.vue'),
     },
     {
+      //用户的详情
+      path: '/UserDatail/:userId?',
+      name: 'UserDatail',
+      component: () => import('@/views/UserDatailView.vue'),
+    },
+    {
       //其他路径
       path: '/:pathMatch(.*)*',
-      redirect: '/home/campus-market',
+      redirect: '/home/campusMarket',
     },
   ],
 })

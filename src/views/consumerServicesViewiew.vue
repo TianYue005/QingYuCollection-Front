@@ -5,14 +5,10 @@
       <!-- 客服头部：头像 / 标题 / 连接状态 -->
       <header class="service-header">
         <div class="service-avatar">
-          <img src="@/assets/picture/logo.svg" alt="AI 客服" />
+          <img src="@/assets/picture/logo.png" alt="AI 客服" />
         </div>
         <div class="service-meta">
           <h1 class="service-title">AI 客服</h1>
-          <p class="service-status">
-            <span class="status-dot" :class="{ 'is-busy': streaming }"></span>
-            {{ streaming ? '正在输入…' : '在线，随时为你解答' }}
-          </p>
         </div>
       </header>
 

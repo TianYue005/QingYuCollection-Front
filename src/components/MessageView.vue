@@ -2,7 +2,7 @@
   <div v-if="!chatId && toUid == null" class="message-placeholder">
     <div class="placeholder-content">
       <div class="logo-wrapper">
-        <img src="@/assets/picture/logo.svg" alt="" />
+        <img src="@/assets/picture/logo.png" alt="" />
       </div>
       <h1 class="placeholder-title">未选择任何联系人</h1>
       <p class="placeholder-subtitle">点击左侧列表开聊吧</p>

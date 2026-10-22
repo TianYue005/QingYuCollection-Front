@@ -105,8 +105,13 @@
                             :src="c.userAvatar"
                             alt="头像"
                             class="comment-avatar"
+                            @click="goUserDetail(c.userId)"
                         />
-                        <span v-else class="comment-avatar comment-avatar-fallback">
+                        <span
+                            v-else
+                            class="comment-avatar comment-avatar-fallback"
+                            @click="goUserDetail(c.userId)"
+                        >
                             {{ avatarInitial(c.userName) }}
                         </span>
                         <div class="comment-meta">
@@ -480,6 +485,12 @@ const splitPictures = (picture: string) => {
 
 /** 用户名首字母（无头像时兜底） */
 const avatarInitial = (name: string) => (name || '?').charAt(0).toUpperCase()
+
+/** 点击评论者头像：跳转到该用户的详情页 */
+const goUserDetail = (userId: number | string | undefined) => {
+    if (userId == null || userId === '') return
+    router.push({ name: 'UserDatail', params: { userId: String(userId) } })
+}
 
 /** 将后端时间（可能是 2026-08-14T01:38:40）格式化为易读的 yyyy-MM-dd HH:mm */
 const formatTime = (time?: string) => {
@@ -857,6 +868,7 @@ onMounted(() => {
     object-fit: cover;
     flex-shrink: 0;
     background: #f5f5f7;
+    cursor: pointer;
 }
 
 .comment-avatar-fallback {

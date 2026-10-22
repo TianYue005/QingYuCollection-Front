@@ -56,23 +56,67 @@
           ></textarea>
         </div>
 
-        <!-- 属性规格 -->
+        <!-- 分类标签 -->
+        <div class="form-group">
+          <div class="form-label">
+            分类标签
+            <span class="required">*</span>
+          </div>
+          <div class="category-options">
+            <button
+              v-for="cat in categoryOptions"
+              :key="cat"
+              type="button"
+              class="category-option"
+              :class="{ active: form.category === cat }"
+              @click="form.category = cat"
+            >
+              {{ cat }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 属性标签 -->
         <div class="form-group">
           <div class="form-label-attr">
-            属性规格
-            <span class="attr-hint">上传主图/填写内容后将为你智能识别属性</span>
+            属性标签
           </div>
-          <div class="attr-tags">
-            <span v-for="(tag, index) in form.attributes" :key="index" class="attr-tag">
+          <!-- 已选标签 -->
+          <div class="attr-selected">
+            <span v-if="form.attributes.length === 0" class="attr-placeholder">暂未选择标签</span>
+            <span v-for="(tag, index) in form.attributes" :key="tag" class="attr-tag">
               {{ tag }}
               <span class="attr-tag-remove" @click="removeAttr(index)">&times;</span>
             </span>
-            <input
-              v-model="attrInput"
-              class="attr-input"
-              placeholder="输入属性后回车添加"
-              @keydown.enter.prevent="addAttribute"
-            />
+          </div>
+          <!-- 站点提供的可选标签 + 更多入口 -->
+          <div class="preset-tags">
+            <button
+              v-for="tag in presetTags"
+              :key="tag"
+              type="button"
+              class="preset-tag"
+              :class="{ active: form.attributes.includes(tag) }"
+              @click="togglePresetTag(tag)"
+            >
+              {{ tag }}
+            </button>
+            <button type="button" class="preset-tag more-tag" @click="toggleMoreTags">
+              {{ moreTagsExpanded ? '收起' : '更多' }}
+            </button>
+          </div>
+          <!-- 更多标签 -->
+          <div v-if="moreTagsExpanded" class="more-tags-panel">
+            <button
+              v-for="tag in moreTags"
+              :key="tag"
+              type="button"
+              class="preset-tag"
+              :class="{ active: form.attributes.includes(tag) }"
+              @click="togglePresetTag(tag)"
+            >
+              {{ tag }}
+            </button>
           </div>
         </div>
 
@@ -127,9 +171,27 @@ import { uploadImages, addItem } from '@/api/item'
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const previewImages = ref<string[]>([])
-const attrInput = ref('')
+const categoryOptions = ['电子产品', '饰品', '家居', '未知']
+// 高频标签，直接展示在外部
+const presetTags = ['99新', '急出', '自提', '包邮', '可小刀']
+// 其余标签，收在“更多”里
+const moreTags = [
+  '全新未拆',
+  '仅拆封',
+  '轻微使用痕迹',
+  '配件齐全',
+  '保修期内',
+  '支持验货',
+  '不议价',
+  '可换',
+  '毕业出',
+  '急用钱',
+  '礼盒装',
+]
+const moreTagsExpanded = ref(false)
 
 const form = reactive({
+  category: '',
   description: '',
   price: '',
   originalPrice: '',
@@ -210,16 +272,23 @@ function removeImage(index: number) {
   }
 }
 
-function addAttribute() {
-  const val = attrInput.value.trim()
-  if (val && !form.attributes.includes(val)) {
-    form.attributes.push(val)
+// 站点标签点选/取消
+function togglePresetTag(tag: string) {
+  const index = form.attributes.indexOf(tag)
+  if (index > -1) {
+    form.attributes.splice(index, 1)
+  } else {
+    form.attributes.push(tag)
   }
-  attrInput.value = ''
 }
 
 function removeAttr(index: number) {
   form.attributes.splice(index, 1)
+}
+
+// 展开/收起更多标签
+function toggleMoreTags() {
+  moreTagsExpanded.value = !moreTagsExpanded.value
 }
 
 function validateNumber(field: 'price' | 'originalPrice', e: Event) {
@@ -243,6 +312,10 @@ async function handleSubmit() {
     toast.warning('请填写宝贝描述')
     return
   }
+  if (!form.category) {
+    toast.warning('请选择分类标签')
+    return
+  }
   if (!form.price) {
     toast.warning('请填写价格')
     return
@@ -264,7 +337,10 @@ async function handleSubmit() {
       description: form.description.trim(),
       price: Number(form.price),
       originalPrice: Number(form.originalPrice) || 0,
-      specs: form.attributes,
+      // 规格属性：分类标签（电子产品、饰品等）
+      specs: [form.category],
+      // 标签：属性标签（99新、急出等）
+      tag: form.attributes,
     })
 
     if (addRes.code === 1) {
@@ -281,12 +357,12 @@ async function handleSubmit() {
 }
 
 function resetForm() {
+  form.category = ''
   form.description = ''
   form.price = ''
   form.originalPrice = ''
   form.attributes = []
   form.images = []
-  attrInput.value = ''
   previewImages.value.forEach((url) => URL.revokeObjectURL(url))
   previewImages.value = []
 }
@@ -509,46 +585,70 @@ function resetForm() {
   border-color: #0066cc;
 }
 
-/* 属性规格 */
-.form-label-attr {
+/* 分类标签 */
+.category-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-option {
+  padding: 8px 20px;
   font-family:
     'SF Pro Text',
     system-ui,
     -apple-system,
     sans-serif;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.24;
-  letter-spacing: -0.374px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.43;
+  letter-spacing: -0.224px;
   color: #1d1d1f;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  background: #f5f5f7;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
-.attr-hint {
+.category-option:hover {
+  border-color: #0066cc;
+}
+
+.category-option.active {
+  background: #0066cc;
+  border-color: #0066cc;
+  color: #ffffff;
+}
+
+/* 属性标签 */
+.attr-selected {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 12px 17px;
+  border: 1px solid #e0e0e0;
+  border-radius: 11px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.attr-placeholder {
+  font-family:
+    'SF Pro Text',
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 14px;
   font-weight: 400;
   line-height: 1.43;
   letter-spacing: -0.224px;
   color: #7a7a7a;
-}
-
-.attr-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  padding: 12px 17px;
-  border: 1px solid #e0e0e0;
-  border-radius: 11px;
-  min-height: 44px;
-  transition: border-color 0.2s ease;
-}
-
-.attr-tags:focus-within {
-  border-color: #0066cc;
 }
 
 .attr-tag {
@@ -582,11 +682,14 @@ function resetForm() {
   color: #e53935;
 }
 
-.attr-input {
-  flex: 1;
-  min-width: 160px;
-  border: none;
-  outline: none;
+.preset-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-tag {
+  padding: 6px 16px;
   font-family:
     'SF Pro Text',
     system-ui,
@@ -597,11 +700,62 @@ function resetForm() {
   line-height: 1.43;
   letter-spacing: -0.224px;
   color: #1d1d1f;
-  padding: 4px 0;
+  background: #f5f5f7;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
-.attr-input::placeholder {
+.preset-tag:hover {
+  border-color: #0066cc;
+}
+
+.preset-tag.active {
+  background: #0066cc;
+  border-color: #0066cc;
+  color: #ffffff;
+}
+
+.more-tag {
   color: #7a7a7a;
+  background: transparent;
+  border-color: #e0e0e0;
+}
+
+.more-tag:hover {
+  color: #0066cc;
+}
+
+.more-tags-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 11px;
+}
+
+.form-label-attr {
+  font-family:
+    'SF Pro Text',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.24;
+  letter-spacing: -0.374px;
+  color: #1d1d1f;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 /* 价格区域 */

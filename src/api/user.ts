@@ -241,18 +241,44 @@ export interface EvaluateVO {
   goodsImgUrl: string
 }
 
+/** 其他用户的详情（对应后端 /user/thisUserDetail/{userId} 返回的 User） */
+export interface UserDetail {
+  userId: number | string
+  userName: string
+  /** 该接口暂未返回头像，缺失时前端展示默认头像 */
+  avatar?: string | null
+  level?: number
+  credit?: number
+  /** 1 正常，2 冻结 */
+  status?: number
+}
+
 /**
- * 查看评价（自己对别人的 / 别人对自己的，分页）
- * @param target 0=我评价别人的（默认） 1=别人评价我的
- * @param trait  1=好评（score>=4） 2=差评（score<=3），不传为全部
+ * 查看其他用户的详情：GET /api/user/thisUserDetail/{userId}
+ * @param userId 被查看用户的 id（来自路由参数，见 views/UserDatailView.vue 顶部说明）
  */
-export const getReviewList = (params: {
-  target?: number
+export const getThisUserDetail = (userId: number | string) => {
+  return api.get<any, Result<UserDetail>>(`/user/thisUserDetail/${userId}`)
+}
+
+/**
+ * 查看评论（该用户对别人的 / 别人对该用户的）
+ * GET /api/user/myReview，参数为 ItemQueryParam：userId + target + trait + 分页，
+ * 返回 Result<PageResult<EvaluateVO>>
+ * @param userId 要查询的用户 id：UserDatailView 传被查看用户的 id，CreditAndReviewsView 传当前登录用户的 id
+ * @param target 0=该用户对别人的评价，1=别人对该用户的评价
+ * @param trait  0/null=全部 1=好评（score>=4） 2=差评（score<=3） 3=来自卖家
+ * 注意：后端方法签名为 selectMyReview(ItemQueryParam)，无 @RequestBody，
+ * 参数由 Spring 直接绑定查询字符串，因此全部走 query 下发。
+ */
+export const getUserReviewList = (params: {
+  userId: number | string
+  target: number
   trait?: number
   pageNumber?: number
   pageSize?: number
 }) => {
-  return api.get<any, Result<PageResult<EvaluateVO>>>('/user/review', { params })
+  return api.get<any, Result<PageResult<EvaluateVO>>>('/user/myReview', { params })
 }
 
 /** 账号基本信息 */
@@ -279,4 +305,9 @@ export const updatePassword = (password: string) => {
   return api.get<any, Result<null>>('/user/updatePassword', {
     params: { password }
   })
+}
+
+/** 修改用户名：POST /user/alterName/{name} */
+export const alterName = (name: string) => {
+  return api.post<any, Result<null>>(`/user/alterName/${encodeURIComponent(name)}`)
 }

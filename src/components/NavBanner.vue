@@ -4,7 +4,7 @@
       <div class="banner-brand">
         <img class="banner-logo" :src="logo" alt="青寓集" width="32" height="32" />
         <span class="banner-name">青寓集</span>
-        <nav class="nav-links">
+        <nav ref="navRef" class="nav-links">
           <router-link 
             class="nav-link" 
             :class="{ active: isActive('/home/campusMarket') }" 
@@ -14,10 +14,10 @@
           </router-link>
           <router-link 
             class="nav-link" 
-            :class="{ active: isActive('/home/tools') }" 
-            to="/home/tools"
+            :class="{ active: isActive('/home/points') }" 
+            to="/home/points"
           >
-            便捷工具
+            积分中心
           </router-link>
           <router-link 
             class="nav-link" 
@@ -26,6 +26,12 @@
           >
             校园论坛
           </router-link>
+          <span
+            v-show="activeNavIndex >= 0"
+            class="nav-indicator"
+            :class="{ 'is-ready': indicatorReady }"
+            :style="indicatorStyle"
+          ></span>
         </nav>
       </div>
       <div class="banner-user" @click="onUserClick">
@@ -37,9 +43,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import logo from '@/assets/picture/logo.svg'
+import logo from '@/assets/picture/logo.png'
 import { isLoggedIn, getUsername, getAccount } from '@/composables/useAuth'
 import { accountInfo, type UserAccountInfo } from '@/api/user'
 import { resolveAvatar } from '@/utils/avatar'
@@ -56,6 +62,50 @@ const displayName = computed(() => storedUserInfo.value?.userName || getUsername
 function isActive(path: string): boolean {
   return route.path.startsWith(path)
 }
+
+// ===== 导航滑动下划线 =====
+const navRef = ref<HTMLElement | null>(null)
+const navPaths = ['/home/campusMarket', '/home/points', '/home/forum']
+const activeNavIndex = computed(() => navPaths.findIndex((path) => route.path.startsWith(path)))
+const indicatorStyle = ref({ width: '0px', transform: 'translateX(0px)' })
+const indicatorReady = ref(false)
+
+/** 根据当前激活的导航项测量下划线位置与宽度 */
+function updateNavIndicator() {
+  const nav = navRef.value
+  if (!nav) return
+  const links = nav.querySelectorAll<HTMLElement>('.nav-link')
+  const el = links[activeNavIndex.value]
+  if (!el) return
+  indicatorStyle.value = {
+    width: `${el.offsetWidth}px`,
+    transform: `translateX(${el.offsetLeft}px)`,
+  }
+}
+
+function handleResize() {
+  updateNavIndicator()
+}
+
+watch(
+  () => route.path,
+  () => nextTick(updateNavIndicator),
+)
+
+// 首帧先定位条纹，再开启过渡，避免初始加载时出现滑动
+onMounted(() => {
+  nextTick(() => {
+    updateNavIndicator()
+    nextTick(() => {
+      indicatorReady.value = true
+    })
+  })
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
 
 // 展示头像（空值或后端占位值"默认头像"时，统一显示默认头像图片）
 const avatarSrc = computed(() => resolveAvatar(storedUserInfo.value?.avatar))
@@ -96,8 +146,10 @@ onMounted(async () => {
 <style scoped>
 /* ===== Apple 风格统一横幅导航 ===== */
 .nav-banner {
-  background: rgba(245, 245, 247, 0.92);
-  backdrop-filter: blur(20px);
+  /* 毛玻璃效果：半透明底色 + 背景模糊 */
+  background: rgba(245, 245, 247, 0.72);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   padding: 0 32px;
   position: sticky;
   top: 0;
@@ -164,6 +216,7 @@ onMounted(async () => {
 }
 
 .nav-links {
+  position: relative;
   display: flex;
   gap: 32px;
   align-items: center;
@@ -180,18 +233,7 @@ onMounted(async () => {
   text-decoration: none;
   cursor: pointer;
   padding-bottom: 6px;
-}
-
-.nav-link::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 2px;
-  border-radius: 1px;
-  background: #0066cc;
-  opacity: 0;
+  transition: color 0.2s ease;
 }
 
 .nav-link:hover,
@@ -199,8 +241,23 @@ onMounted(async () => {
   color: #0066cc;
 }
 
-.nav-link.active::after {
-  opacity: 1;
+/* 滑动下划线：切换导航时在按钮下方平滑移动 */
+.nav-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: #0066cc;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* 滑动下划线：切换导航时在按钮下方平滑移动。
+   只过渡 transform，保证它是合成器动画：
+   路由切换时主线程忙着挂载新页面，width/left 这类主线程动画会被拖慢 */
+.nav-indicator.is-ready {
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (max-width: 640px) {

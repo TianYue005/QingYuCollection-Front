@@ -9,11 +9,24 @@ export interface Picture {
 }
 
 export interface UploadItemDTO {
+  /** 图片（含 URL、宽、高） */
   image: Picture[]
+  /** 描述 */
   description: string
+  /** 价钱 */
   price: number
+  /** 原价 */
   originalPrice: number
+  /** 规格属性：电子产品、饰品这一类的标签 */
   specs: string[]
+  /** 标签：99新、急出这一类的标签 */
+  tag: string[]
+  /** 用户 id，后端提供 */
+  userId?: number
+  /** 标签的整数化存储形式，后端生成 */
+  IntTag?: number
+  /** 商品 id，后端提供 */
+  goodsId?: number
 }
 
 /** 商品 VO（与后端 /items/{id} 和 /items/list 返回一致，对应 Goods 类） */
@@ -50,6 +63,12 @@ export interface GoodsVO {
   /** 当前用户是否已收藏 */
   favourite: boolean
   imgList: GoodsImage[]
+  /** 简易图片展示：首图平铺字段（部分接口直接返回） */
+  imgUrl?: string
+  imgWidth?: number
+  imgHeight?: number
+  /** 卖家信誉积分 */
+  credit?: number
 }
 
 /** 我已卖出的商品（与后端 /items/select/mySold 返回的 GoodsVO 对齐，只包含已完成交易的记录） */
@@ -140,6 +159,15 @@ export const getItemsToPage = (params: ItemQueryParam) => {
 /** 根据关键词模糊搜索商品 */
 export const searchItemsByKeyword = (params: KeywordSearchParam) => {
   return api.get<any, Result<PageResult<GoodsVO>>>('/items/search', { params })
+}
+
+/**
+ * 商品推荐（GET /items/recommend）
+ * 后端从 redis 的 goods:recommend 集合取商品（SQL 已关联 goods_image，返回 imgList），
+ * data 为推荐商品列表
+ */
+export const getRecommendItems = () => {
+  return api.get<any, Result<GoodsVO[]>>('/items/recommend')
 }
 
 /** 查询当前用户发布的商品 */

@@ -34,8 +34,13 @@
                         :src="c.userAvatar"
                         alt="头像"
                         class="cc-avatar"
+                        @click="goUserDetail(c.userId)"
                     />
-                    <span v-else class="cc-avatar cc-avatar-fallback">
+                    <span
+                        v-else
+                        class="cc-avatar cc-avatar-fallback"
+                        @click="goUserDetail(c.userId)"
+                    >
                         {{ avatarInitial(c.userName) }}
                     </span>
                     <div class="cc-meta">
@@ -149,12 +154,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { addCircleComment, selectCircleComment, selectCircleCommentInteraction } from '@/api/forum'
 import type { CommentCircleVO } from '@/api/forum'
 import { getUserId } from '@/composables/useAuth'
 import { resolveAvatar } from '@/utils/avatar'
 
 const props = defineProps<{ circleId: number | string }>()
+
+const router = useRouter()
 
 const comments = ref<CommentCircleVO[]>([])
 const commentLoading = ref(false)
@@ -333,6 +341,12 @@ const splitPictures = (picture: string) => {
 
 const avatarInitial = (name: string) => (name || '?').charAt(0).toUpperCase()
 
+/** 点击评论者头像：跳转到该用户的详情页 */
+const goUserDetail = (userId: number | string | undefined) => {
+    if (userId == null || userId === '') return
+    router.push({ name: 'UserDatail', params: { userId: String(userId) } })
+}
+
 /** 根据 parentId 链路计算评论层级深度，用于缩进展示（最多缩进 3 层） */
 const depthClass = (c: CommentCircleVO): string => {
     const idMap = new Map<number, CommentCircleVO>()
@@ -482,6 +496,7 @@ watch(() => props.circleId, () => {
     object-fit: cover;
     flex-shrink: 0;
     background: #f5f5f7;
+    cursor: pointer;
 }
 
 .cc-avatar-fallback {

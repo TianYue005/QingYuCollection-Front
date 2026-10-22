@@ -19,7 +19,11 @@
         <!-- 卖家信息 -->
         <div class="seller-card">
           <div class="seller-card__avatar">
-            <img :src="sellerDetail?.sellerAvatar || ''" alt="卖家头像" />
+            <img
+              :src="sellerDetail?.sellerAvatar || ''"
+              alt="卖家头像"
+              @click="goUserDetail(sellerDetail?.sellerId)"
+            />
           </div>
           <div class="seller-card__body">
             <div class="seller-card__name">{{ sellerDetail?.sellerName }}</div>
@@ -149,8 +153,13 @@
                 :src="c.userAvatar"
                 alt="头像"
                 class="comment-card__avatar"
+                @click="goUserDetail(c.userId)"
               />
-              <span v-else class="comment-card__avatar comment-card__avatar--fallback">
+              <span
+                v-else
+                class="comment-card__avatar comment-card__avatar--fallback"
+                @click="goUserDetail(c.userId)"
+              >
                 {{ avatarInitial(c.userName) }}
               </span>
               <div class="comment-card__meta">
@@ -480,6 +489,12 @@ const handleChat = () => startChat('item')
 /** 点击"购买"：进入聊天并自动向卖家发送交易请求 */
 const handleBuy = () => startChat('buy')
 
+/** 点击用户头像（卖家 / 评论人）：跳转到该用户的详情页 */
+const goUserDetail = (userId: number | string | undefined) => {
+  if (userId == null || userId === '') return
+  router.push({ name: 'UserDatail', params: { userId: String(userId) } })
+}
+
 const lastSeenText = computed(() => {
   const t = sellerDetail.value?.overTime ?? 0
   return t <= 3 ? '刚刚来过' : `${t}分钟前来过`
@@ -790,6 +805,7 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: pointer;
 }
 
 .seller-card__body {
@@ -1196,6 +1212,7 @@ onMounted(() => {
   object-fit: cover;
   flex-shrink: 0;
   background: #e8e8ed;
+  cursor: pointer;
 }
 
 .comment-card__avatar--fallback {

@@ -76,7 +76,12 @@
         <div v-for="item in list" :key="item.id" class="review-card">
           <!-- 评价人 / 被评价人 -->
           <div class="review-head">
-            <img class="review-avatar" :src="resolveAvatar(oppositeAvatar(item))" alt="头像" />
+            <img
+              class="review-avatar"
+              :src="resolveAvatar(oppositeAvatar(item))"
+              alt="头像"
+              @click="goUserDetail(oppositeId(item))"
+            />
             <div class="review-user">
               <div class="review-name-row">
                 <span class="review-name">{{ oppositeName(item) || '匿名用户' }}</span>
@@ -134,10 +139,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getReviewList, type EvaluateVO } from '@/api/user'
+import { getUserReviewList, type EvaluateVO } from '@/api/user'
 import { resolveAvatar } from '@/utils/avatar'
+import { getUserId } from '@/composables/useAuth'
 
 const router = useRouter()
+
+/** 读取缓存的用户信息（NavBanner 登录后写入），用于取当前用户 id */
+const readCachedUserInfo = () => {
+  try {
+    const cached = localStorage.getItem('userInfo') || sessionStorage.getItem('userInfo')
+    return cached ? JSON.parse(cached) : null
+  } catch {
+    return null
+  }
+}
+
+/** 当前登录用户 id：/user/myReview 需要显式传 userId（缓存的 userInfo 缺失时退回解析 token） */
+const currentUserId: number | string | null = readCachedUserInfo()?.userId ?? getUserId()
 
 /* ---- 筛选条件 ---- */
 const targetOptions = [
@@ -196,6 +215,10 @@ function oppositeName(item: EvaluateVO): string {
 function oppositeAvatar(item: EvaluateVO): string {
   return target.value === 0 ? item.evaluatedAvatar : item.evaluatorAvatar
 }
+/** 评价对象（对方）的用户 id：我评价的看被评价人，别人评价我的看评价人 */
+function oppositeId(item: EvaluateVO): number | string {
+  return target.value === 0 ? item.evaluatedId : item.evaluatorId
+}
 const oppositeRole = computed(() => (target.value === 0 ? '被评价人' : '评价人'))
 
 /** 后端 trait 口径：score>=4 为好评，<=3 为差评 */
@@ -204,6 +227,12 @@ const isGood = (item: EvaluateVO) => (Number(item.score) || 0) >= 4
 const goItem = (goodsId: number | string) => {
   if (!goodsId) return
   router.push({ name: 'item', params: { id: String(goodsId) } })
+}
+
+/** 点击评价人头像：跳转到该用户的详情页 */
+const goUserDetail = (userId: number | string) => {
+  if (userId == null || userId === '') return
+  router.push({ name: 'UserDatail', params: { userId: String(userId) } })
 }
 
 /**
@@ -224,13 +253,19 @@ function resolvePage(res: unknown): { total: number; rows: EvaluateVO[] } | null
   return null
 }
 
-/* ---- 列表查询：/user/review ---- */
+/* ---- 列表查询：/user/myReview（复用 UserDatailView 的接口，userId 传当前登录用户） ---- */
 async function fetchList(targetPage = page.value) {
   if (loading.value) return
+  if (currentUserId == null || currentUserId === '') {
+    firstLoading.value = false
+    error.value = '未获取到登录用户信息，无法加载评价'
+    return
+  }
   loading.value = true
   error.value = ''
   try {
-    const res = await getReviewList({
+    const res = await getUserReviewList({
+      userId: currentUserId,
       target: target.value,
       // trait=0 表示全部，不传给后端
       trait: trait.value > 0 ? trait.value : undefined,
@@ -410,6 +445,7 @@ onMounted(() => {
   border-radius: 50%;
   object-fit: cover;
   background: #f0f0f3;
+  cursor: pointer;
 }
 
 .review-user {

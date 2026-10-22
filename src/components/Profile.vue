@@ -37,7 +37,7 @@
           <span class="info-label">用户名</span>
           <div class="info-value-row">
             <span class="info-value">{{ username }}</span>
-            <button class="text-link">修改</button>
+            <button class="text-link" @click="openNameChange">修改</button>
           </div>
         </li>
         <li class="info-item">
@@ -225,6 +225,51 @@
       </Transition>
     </Teleport>
 
+    <!-- 修改用户名弹窗 -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showNameChange" class="modal-overlay" @click.self="showNameChange = false">
+          <div class="modal-card">
+            <!-- 头部 -->
+            <div class="modal-header">
+              <h3 class="modal-title">修改用户名</h3>
+              <p class="modal-desc">请输入新的用户名</p>
+              <button class="modal-close" @click="showNameChange = false" aria-label="关闭">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M4.5 4.5L13.5 13.5M13.5 4.5L4.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- 表单 -->
+            <div class="modal-body">
+              <div class="input-group">
+                <label class="input-label">新用户名</label>
+                <div class="input-wrapper">
+                  <input
+                    v-model="nameForm.newName"
+                    type="text"
+                    class="custom-input"
+                    placeholder="请输入新用户名"
+                    maxlength="20"
+                    @keyup.enter="submitNameForm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 底部按钮 -->
+            <div class="modal-footer">
+              <button class="modal-btn modal-btn-cancel" @click="showNameChange = false">取消</button>
+              <button class="modal-btn modal-btn-confirm" :disabled="submittingName" @click="submitNameForm">
+                {{ submittingName ? '提交中...' : '确认修改' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- 退出登录确认弹窗 -->
     <Teleport to="body">
       <Transition name="modal-fade">
@@ -256,8 +301,8 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAccount } from '@/composables/useAuth'
-import { accountInfo, updatePassword, type UserAccountInfo } from '@/api/user'
+import { getAccount, setUserInfo } from '@/composables/useAuth'
+import { accountInfo, updatePassword, alterName, type UserAccountInfo } from '@/api/user'
 import { toast } from '@/utils/message'
 import { resolveAvatar } from '@/utils/avatar'
 
@@ -272,6 +317,8 @@ const level = ref(1)
 const credit = ref(100)
 const balance = ref('0')
 const handlePasswordChange = ref(false)
+const showNameChange = ref(false)
+const submittingName = ref(false)
 const showLogoutConfirm = ref(false)
 const showOldPassword = ref(false)
 const showNewPassword = ref(false)
@@ -281,16 +328,20 @@ const passwordForm = reactive({
   newPassword: '',
   confirmPassword: '',
 })
+const nameForm = reactive({
+  newName: '',
+})
 
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
     if (handlePasswordChange.value) handlePasswordChange.value = false
+    if (showNameChange.value) showNameChange.value = false
     if (showLogoutConfirm.value) showLogoutConfirm.value = false
   }
 }
 
-watch([handlePasswordChange, showLogoutConfirm], ([passwordOpen, logoutOpen]) => {
-  if (passwordOpen || logoutOpen) {
+watch([handlePasswordChange, showNameChange, showLogoutConfirm], ([passwordOpen, nameOpen, logoutOpen]) => {
+  if (passwordOpen || nameOpen || logoutOpen) {
     document.addEventListener('keydown', onKeydown)
   } else {
     document.removeEventListener('keydown', onKeydown)
@@ -323,6 +374,41 @@ const submitPasswordForm = async () => {
   }
 }
 
+
+const openNameChange = () => {
+  nameForm.newName = username.value
+  showNameChange.value = true
+}
+
+const submitNameForm = async () => {
+  const newName = nameForm.newName.trim()
+  if (!newName) {
+    toast.error('用户名不能为空')
+    return
+  }
+  if (newName === username.value) {
+    toast.error('用户名未发生变化')
+    return
+  }
+  if (submittingName.value) return
+  submittingName.value = true
+  try {
+    const res = await alterName(newName)
+    if (res.code === 1) {
+      username.value = newName
+      setUserInfo(newName, account.value)
+      toast.success('用户名修改成功')
+      showNameChange.value = false
+    } else {
+      toast.error(res.msg || '用户名修改失败')
+    }
+  } catch (e) {
+    console.error('修改用户名失败：', e)
+    toast.error('用户名修改失败')
+  } finally {
+    submittingName.value = false
+  }
+}
 
 const handleLogout = () => {
   // 清除两个可能存储 Token / 用户信息的位置
@@ -899,6 +985,11 @@ onMounted(() => {
 
 .modal-btn:active {
   transform: scale(0.97);
+}
+
+.modal-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .modal-btn-cancel {
