@@ -77,6 +77,13 @@
                         查看该评论之前的互动
                     </button>
                     <button class="cc-reply-btn" @click="openReply(c)">回复</button>
+                    <button
+                        v-if="commentReportType != null"
+                        class="cc-reply-btn"
+                        @click="openCommentReport(c)"
+                    >
+                        举报
+                    </button>
                     <span v-if="c.son > 0" class="cc-son-count">{{ c.son }} 条回复</span>
                 </div>
             </div>
@@ -149,6 +156,16 @@
                 </div>
             </Transition>
         </Teleport>
+
+        <!-- 举报弹窗 -->
+        <ReportDialog
+            v-model:visible="reportVisible"
+            :label="reportLabel"
+            :report-type="commentReportType ?? 0"
+            :report-id="reportCommentId"
+            :object-id="circleId"
+            :report="reportContent"
+        />
     </div>
 </template>
 
@@ -159,8 +176,13 @@ import { addCircleComment, selectCircleComment, selectCircleCommentInteraction }
 import type { CommentCircleVO } from '@/api/forum'
 import { getUserId } from '@/composables/useAuth'
 import { resolveAvatar } from '@/utils/avatar'
+import ReportDialog from '@/components/ReportDialog.vue'
 
-const props = defineProps<{ circleId: number | string }>()
+const props = defineProps<{
+    circleId: number | string
+    /** 评论举报类型（5 动态评论、7 任务评论、9 活动评论），不传则不显示举报按钮 */
+    commentReportType?: number
+}>()
 
 const router = useRouter()
 
@@ -333,6 +355,19 @@ const openInteraction = async (comment: CommentCircleVO) => {
 
 const closeInteraction = () => {
     showInteraction.value = false
+}
+
+/** 举报评论：reportId 为评论 id，objectId 为所在圈子动态 id */
+const reportVisible = ref(false)
+const reportLabel = ref('')
+const reportCommentId = ref<number | string>('')
+const reportContent = ref('')
+
+const openCommentReport = (comment: CommentCircleVO) => {
+    reportLabel.value = `评论：${comment.text || comment.id}`
+    reportCommentId.value = comment.id
+    reportContent.value = comment.text || ''
+    reportVisible.value = true
 }
 
 const splitPictures = (picture: string) => {

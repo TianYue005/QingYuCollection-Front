@@ -16,6 +16,9 @@
  *   手动解析 SSE，既能带鉴权头，又能随时 abort 中断。
  */
 
+import { getShortToken } from '@/composables/useAuth'
+import { refreshShortTokenOrLogout } from './index'
+
 /** 对话消息（role 区分用户 / AI） */
 export interface AiChatMessage {
   role: 'user' | 'assistant'
@@ -29,7 +32,7 @@ export const AI_CHAT_STREAM_URL = '/api/customer/service/connect'
 const DONE_FLAG = '[DONE]'
 
 function readToken(): string {
-  return localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+  return getShortToken() || ''
 }
 
 /**
@@ -88,16 +91,21 @@ export interface StreamChatOptions {
 export async function streamAiChat(message: string, options: StreamChatOptions): Promise<void> {
   const { signal, onDelta, onDone, onError } = options
   try {
-    const token = readToken()
-    const response = await fetch(`${AI_CHAT_STREAM_URL}?message=${encodeURIComponent(message)}`, {
-      method: 'GET',
-      headers: {
-        Accept: 'text/event-stream',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      signal,
-    })
+    const send = (token: string) =>
+      fetch(`${AI_CHAT_STREAM_URL}?message=${encodeURIComponent(message)}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/event-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal,
+      })
 
+    let response = await send(readToken())
+    // 短期 token 失效：用长期 token 换新的短期 token 后重试一次（失败则退出登录）
+    if (response.status === 401) {
+      response = await send(await refreshShortTokenOrLogout())
+    }
     if (response.status === 401) throw new Error('登录已过期，请重新登录后再试')
     if (!response.ok) throw new Error(`AI 客服响应异常（${response.status}）`)
     if (!response.body) throw new Error('当前浏览器不支持流式响应')

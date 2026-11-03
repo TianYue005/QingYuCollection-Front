@@ -86,7 +86,9 @@
 
           <!-- 取消交易 -->
           <div class="cancel-row">
-            <button class="cancel-btn" @click="onCancel">不想交易了？点击取消交易以拒绝</button>
+            <button class="cancel-btn" :disabled="cancelling" @click="onCancel">
+              {{ cancelling ? '正在拒绝交易…' : '不想交易了？点击取消交易以拒绝' }}
+            </button>
           </div>
         </div>
       </div>
@@ -98,7 +100,13 @@
 import { onMounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { toast } from '@/utils/message'
-import { getMyVerifyCode, getUserPending, submitOtherVerifyCode, type Pending } from '@/api/user'
+import {
+  getMyVerifyCode,
+  getUserPending,
+  rejectTradeRequest,
+  submitOtherVerifyCode,
+  type Pending,
+} from '@/api/user'
 
 const loading = ref(false)
 const list = ref<Pending[]>([])
@@ -113,6 +121,8 @@ const myCode = ref('')
 const myCodeLoading = ref(false)
 /** 是否正在提交对方的操作码 */
 const submitting = ref(false)
+/** 是否正在拒绝交易 */
+const cancelling = ref(false)
 /** 对方操作码输入 */
 const otherCode = ref('')
 
@@ -201,9 +211,36 @@ async function onApply() {
   }
 }
 
-/** 占位动作：取消交易（接口待接入） */
-function onCancel() {
-  alert('取消交易：接口待接入')
+/** 拒绝交易：二次确认后把商品 id 传给后端，成功后关闭弹窗并刷新待处理列表 */
+async function onCancel() {
+  const item = current.value
+  if (!item || cancelling.value) return
+  try {
+    await ElMessageBox.confirm('拒绝后本次交易将取消，商品会回到待售状态，确定拒绝吗？', '拒绝交易', {
+      confirmButtonText: '确定拒绝',
+      cancelButtonText: '再想想',
+      type: 'warning',
+    })
+  } catch {
+    // 用户点了“再想想”，不做任何处理
+    return
+  }
+  cancelling.value = true
+  try {
+    const res = await rejectTradeRequest(item.goodsId)
+    if (res.code === 1) {
+      toast.success('已拒绝交易')
+      closeDetail()
+      await fetchPending()
+    } else {
+      toast.error(res.msg || '拒绝交易失败')
+    }
+  } catch (error) {
+    console.error('拒绝交易失败:', error)
+    toast.error('拒绝交易失败，请稍后重试')
+  } finally {
+    cancelling.value = false
+  }
 }
 
 async function fetchPending() {
@@ -660,5 +697,11 @@ onMounted(fetchPending)
 
 .cancel-btn:hover {
   text-decoration: underline;
+}
+
+.cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
 }
 </style>

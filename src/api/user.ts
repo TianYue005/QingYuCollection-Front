@@ -22,9 +22,21 @@ export const register = (data: RegisterParams) => {
   return api.post<any, Result<string>>('/user/register', data)
 }
 
-/** 用户登录，返回 Result，data 为 JWT 令牌 */
+/** 登录返回的令牌信息（对应后端 TokenVO） */
+export interface TokenVO {
+  /** 短期 token：除登录、注册外的所有请求都用它 */
+  shortToken: string
+  /** 长期 token：仅用于换取新的短期 token */
+  longToken?: string
+  /** 后端字段名可能首字母大写，做兼容 */
+  LongToken?: string
+  /** 后端附加提示信息 */
+  message?: string
+}
+
+/** 用户登录，返回 Result，data 为长期 token + 短期 token */
 export const login = (data: LoginParams) => {
-  return api.post<any, Result<string>>('/user/login', data)
+  return api.post<any, Result<TokenVO>>('/user/login', data)
 }
 
 export interface UserInfo {
@@ -144,6 +156,15 @@ export const submitOtherVerifyCode = (payload: {
   operate: number
 }) => {
   return api.post<any, number>('/websocket/tradeRequest/otherVerifyCode', payload)
+}
+
+/**
+ * 拒绝交易：POST /websocket/tradeRequest/Reject/{goodsId}
+ * 仅针对已同意但未完成的交易，后端会把 goods.sold 重置为 NULL（交易取消，商品回到待售状态）。
+ * 返回 Result<String>，code=1 表示操作成功。
+ */
+export const rejectTradeRequest = (goodsId: number | string) => {
+  return api.post<any, Result<string>>(`/websocket/tradeRequest/Reject/${goodsId}`)
 }
 
 /** 待处理交易商品（对应后端 Pending 实体：查询当前用户已同意但未结束交易的商品） */
@@ -310,4 +331,17 @@ export const updatePassword = (password: string) => {
 /** 修改用户名：POST /user/alterName/{name} */
 export const alterName = (name: string) => {
   return api.post<any, Result<null>>(`/user/alterName/${encodeURIComponent(name)}`)
+}
+
+/**
+ * 修改用户头像：PUT /user/avatar
+ * 后端以 MultipartFile[] files 接收，因此表单字段名为 files（只传一张）
+ * 后端不返回新头像地址，修改成功后需重新拉取账号信息获取 avatar
+ */
+export const alterAvatar = (file: File) => {
+  const formData = new FormData()
+  formData.append('files', file)
+  return api.put<any, Result<null>>('/user/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
 }

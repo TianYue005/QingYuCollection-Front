@@ -8,12 +8,20 @@
           <div v-else class="avatar-placeholder">
             {{ (username || '用户').charAt(0) }}
           </div>
-          <button class="avatar-edit-btn" aria-label="修改头像">
+          <button class="avatar-edit-btn" aria-label="修改头像" :disabled="avatarUploading" @click="triggerAvatarSelect">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M11.5 1.5L14.5 4.5L5 14H2V11L11.5 1.5Z" stroke="currentColor" stroke-width="1.5"
                 stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
+          <div v-if="avatarUploading" class="avatar-uploading">上传中</div>
+          <input
+            ref="avatarInput"
+            type="file"
+            accept="image/*"
+            class="avatar-file-input"
+            @change="handleAvatarChange"
+          />
         </div>
       </div>
       <div class="hero-info">
@@ -301,8 +309,8 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAccount, setUserInfo } from '@/composables/useAuth'
-import { accountInfo, updatePassword, alterName, type UserAccountInfo } from '@/api/user'
+import { getAccount, setUserInfo, clearTokens } from '@/composables/useAuth'
+import { accountInfo, updatePassword, alterName, alterAvatar, type UserAccountInfo } from '@/api/user'
 import { toast } from '@/utils/message'
 import { resolveAvatar } from '@/utils/avatar'
 
@@ -312,6 +320,10 @@ const username = ref('')
 const account = ref('')
 const userId = ref<number | null>(null)
 const avatar = ref<string | null>(null)
+const avatarInput = ref<HTMLInputElement | null>(null)
+const avatarUploading = ref(false)
+/** 本地预览用的 objectURL，需在替换或卸载时释放 */
+let avatarPreviewUrl: string | null = null
 const status = ref(1)
 const level = ref(1)
 const credit = ref(100)
@@ -350,7 +362,107 @@ watch([handlePasswordChange, showNameChange, showLogoutConfirm], ([passwordOpen,
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
+  releaseAvatarPreview()
 })
+
+/** 释放本地头像预览的 objectURL，避免内存泄漏 */
+const releaseAvatarPreview = () => {
+  if (avatarPreviewUrl) {
+    URL.revokeObjectURL(avatarPreviewUrl)
+    avatarPreviewUrl = null
+  }
+}
+
+const triggerAvatarSelect = () => {
+  if (avatarUploading.value) return
+  avatarInput.value?.click()
+}
+
+/**
+ * 将图片居中裁成正方形后再裁成圆形，输出带透明通道的 PNG
+ * 这样上传的源文件本身即是圆形，不依赖页面 CSS 的 border-radius
+ */
+const cropToCircle = (file: File, size = 400): Promise<File> =>
+  new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('当前浏览器不支持画布裁剪'))
+        return
+      }
+      // 按短边居中裁出正方形区域，保证不变形
+      const side = Math.min(img.naturalWidth, img.naturalHeight)
+      const sx = (img.naturalWidth - side) / 2
+      const sy = (img.naturalHeight - side) / 2
+      ctx.beginPath()
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+      ctx.clip()
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('头像裁剪失败'))
+          return
+        }
+        resolve(new File([blob], 'avatar.png', { type: 'image/png' }))
+      }, 'image/png')
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('图片解析失败'))
+    }
+    img.src = url
+  })
+
+const handleAvatarChange = async (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  // 清空 input，保证重复选择同一张图片时也能触发 change
+  input.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error('图片大小不能超过 5MB')
+    return
+  }
+  if (avatarUploading.value) return
+
+  // 先本地预览（预览的就是裁圆后的结果），上传失败时回滚
+  const previousAvatar = avatar.value
+  avatarUploading.value = true
+  try {
+    const croppedFile = await cropToCircle(file)
+    releaseAvatarPreview()
+    avatarPreviewUrl = URL.createObjectURL(croppedFile)
+    avatar.value = avatarPreviewUrl
+    const res = await alterAvatar(croppedFile)
+    if (res.code === 1) {
+      await fetchAccountInfo()
+      // 已拿到后端最新头像地址时再释放本地预览
+      if (avatar.value !== avatarPreviewUrl) releaseAvatarPreview()
+      toast.success('头像修改成功')
+    } else {
+      avatar.value = previousAvatar
+      releaseAvatarPreview()
+      toast.error(res.msg || '头像修改失败')
+    }
+  } catch (err) {
+    console.error('修改头像失败：', err)
+    avatar.value = previousAvatar
+    releaseAvatarPreview()
+    toast.error(err instanceof Error && err.message ? err.message : '头像修改失败')
+  } finally {
+    avatarUploading.value = false
+  }
+}
 
 const submitPasswordForm = async () => {
   if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -411,12 +523,11 @@ const submitNameForm = async () => {
 }
 
 const handleLogout = () => {
-  // 清除两个可能存储 Token / 用户信息的位置
-  localStorage.removeItem('token')
+  // 清除两个可能存储 Token / 用户信息的位置（含长期 token）
+  clearTokens()
   localStorage.removeItem('username')
   localStorage.removeItem('account')
   localStorage.removeItem('userInfo')
-  sessionStorage.removeItem('token')
   sessionStorage.removeItem('username')
   sessionStorage.removeItem('account')
   sessionStorage.removeItem('userInfo')
@@ -565,6 +676,30 @@ onMounted(() => {
 
 .avatar-edit-btn:hover {
   background: var(--color-divider-soft);
+}
+
+.avatar-edit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 隐藏原生文件选择框，由头像上的编辑按钮触发 */
+.avatar-file-input {
+  display: none;
+}
+
+/* 上传中的遮罩 */
+.avatar-uploading {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .hero-info {

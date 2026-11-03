@@ -27,15 +27,6 @@
           </div>
           <div class="seller-card__body">
             <div class="seller-card__name">{{ sellerDetail?.sellerName }}</div>
-            <div class="seller-card__meta">
-              <span>{{ lastSeenText }}</span>
-              <span class="seller-card__separator" aria-hidden="true"></span>
-              <span>{{ registerText }}</span>
-              <span class="seller-card__separator" aria-hidden="true"></span>
-              <span>{{ soldText }}</span>
-              <span class="seller-card__separator" aria-hidden="true"></span>
-              <span>{{ goodRateText }}</span>
-            </div>
           </div>
         </div>
 
@@ -52,10 +43,14 @@
         <div class="product-detail">
           <div class="product-detail__price-row">
             <span class="product-detail__price">&yen;{{ product?.price }}</span>
-            <span class="product-detail__original-price">&yen;{{ product?.originalPrice }}</span>
+            <span v-if="product?.originalPrice" class="product-detail__original-price"
+              >&yen;{{ product.originalPrice }}</span
+            >
           </div>
 
-          <span class="product-detail__condition">{{ product?.productStatus }}</span>
+          <div v-if="product?.specs" class="product-detail__badges">
+            <span class="product-detail__specs">{{ product.specs }}</span>
+          </div>
 
           <p class="product-detail__desc">{{ product?.productDesc }}</p>
 
@@ -92,6 +87,9 @@
               :disabled="chatCreating"
               @click="handleBuy"
             >购买</button>
+            <div class="product-detail__footer">
+              <button type="button" class="btn-report" @click="openGoodsReport">举报商品</button>
+            </div>
           </div>
         </div>
       </div>
@@ -196,6 +194,7 @@
                 查看该评论之前的互动
               </button>
               <button class="comment-card__reply" @click="openReply(c)">回复</button>
+              <button class="comment-card__report" @click="openCommentReport(c)">举报</button>
               <span v-if="c.son > 0" class="comment-card__son">{{ c.son }} 条回复</span>
             </div>
           </div>
@@ -229,6 +228,35 @@
                 <button class="cc-btn-cancel" @click="closeReply">取消</button>
                 <button class="cc-btn-submit" :disabled="replySubmitting" @click="submitReply">
                   {{ replySubmitting ? '回复中...' : '回复' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+
+      <!-- 举报弹窗 -->
+      <Teleport to="body">
+        <Transition name="cc-dialog">
+          <div v-if="showReport" class="cc-overlay" @click.self="closeReport">
+            <div class="cc-dialog-card">
+              <h3 class="cc-dialog-title">举报</h3>
+
+              <p class="cc-reply-target">举报对象：{{ reportLabel }}</p>
+
+              <textarea
+                v-model="reportReason"
+                class="comment-composer__input"
+                placeholder="请填写举报理由..."
+                maxlength="200"
+              ></textarea>
+
+              <p v-if="reportError" class="comment-section__error">{{ reportError }}</p>
+
+              <div class="cc-dialog-actions">
+                <button class="cc-btn-cancel" @click="closeReport">取消</button>
+                <button class="cc-btn-submit" :disabled="reportSubmitting" @click="submitReport">
+                  {{ reportSubmitting ? '提交中...' : '提交举报' }}
                 </button>
               </div>
             </div>
@@ -310,7 +338,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
 import { ElCarousel, ElCarouselItem } from 'element-plus'
 import { toast } from '@/utils/message'
-import { getItemById, addItemComment, selectItemComment, selectItemCommentInteraction, type GoodsVO, type CommentGoodsVO } from '@/api/item'
+import { getItemById, addItemComment, selectItemComment, selectItemCommentInteraction, reportComment, type GoodsVO, type CommentGoodsVO, type ReportDTO } from '@/api/item'
 import { toggleFavorite as toggleFavoriteApi, removeFavorite, createChatSession } from '@/api/user'
 import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
 import { getUserId } from '@/composables/useAuth'
@@ -336,7 +364,7 @@ type ProductDetail = {
   productDesc: string
   price: number
   originalPrice: number
-  productStatus: string
+  specs: string
 }
 
 const carouselItems = ref<string[]>([])
@@ -495,26 +523,6 @@ const goUserDetail = (userId: number | string | undefined) => {
   router.push({ name: 'UserDatail', params: { userId: String(userId) } })
 }
 
-const lastSeenText = computed(() => {
-  const t = sellerDetail.value?.overTime ?? 0
-  return t <= 3 ? '刚刚来过' : `${t}分钟前来过`
-})
-
-const registerText = computed(() => {
-  const days = sellerDetail.value?.sellerRegisterTime ?? 0
-  return days <= 365 ? `已注册 ${days} 天` : `已注册 ${Math.floor(days / 365)} 年`
-})
-
-const soldText = computed(() => {
-  const count = sellerDetail.value?.sellerSellCount ?? 0
-  return `已卖出 ${count} 件`
-})
-
-const goodRateText = computed(() => {
-  const rate = sellerDetail.value?.sellerGoodRate ?? 0
-  return `好评率 ${rate}%`
-})
-
 async function fetchItem() {
   loading.value = true
   notFound.value = false
@@ -527,7 +535,7 @@ async function fetchItem() {
         productDesc: item.goodsDesc || '',
         price: item.price ?? 0,
         originalPrice: item.originalPrice ?? 0,
-        productStatus: item.tags?.split(',')[0] ?? '',
+        specs: item.specs || '',
       }
       carouselItems.value = item.imgList?.map((img) => img.imgUrl) ?? []
       sellerDetail.value = {
@@ -722,6 +730,78 @@ const closeInteraction = () => {
   showInteraction.value = false
 }
 
+// ==================== 举报 ====================
+/** 商品举报 type = 1，商品详情页评论举报 type = 0 */
+const REPORT_TYPE_GOODS = 1
+const REPORT_TYPE_COMMENT = 0
+
+const showReport = ref(false)
+const reportLabel = ref('')
+const reportPayload = ref<ReportDTO | null>(null)
+const reportReason = ref('')
+const reportSubmitting = ref(false)
+const reportError = ref('')
+
+const openGoodsReport = () => {
+  reportLabel.value = `商品：${product.value.productDesc || itemId}`
+  reportPayload.value = {
+    report: product.value.productDesc || '',
+    reportId: itemId,
+    objectId: itemId,
+    type: REPORT_TYPE_GOODS,
+    reason: '',
+  }
+  reportReason.value = ''
+  reportError.value = ''
+  showReport.value = true
+}
+
+const openCommentReport = (comment: CommentGoodsVO) => {
+  reportLabel.value = `评论：${comment.text || comment.id}`
+  reportPayload.value = {
+    report: comment.text || '',
+    reportId: comment.id,
+    objectId: itemId,
+    type: REPORT_TYPE_COMMENT,
+    reason: '',
+  }
+  reportReason.value = ''
+  reportError.value = ''
+  showReport.value = true
+}
+
+const closeReport = () => {
+  showReport.value = false
+}
+
+const submitReport = async () => {
+  const reason = reportReason.value.trim()
+  if (!reason) {
+    reportError.value = '请填写举报理由'
+    return
+  }
+  if (!currentUserId) {
+    reportError.value = '请先登录后再举报'
+    return
+  }
+  if (!reportPayload.value) return
+  reportSubmitting.value = true
+  reportError.value = ''
+  try {
+    const res = await reportComment({ ...reportPayload.value, reason })
+    if (res.code === 1) {
+      showReport.value = false
+      toast.success('举报已提交')
+    } else {
+      reportError.value = res.msg || '举报失败'
+    }
+  } catch {
+    reportError.value = '举报失败，请稍后重试'
+  } finally {
+    reportSubmitting.value = false
+  }
+}
+
 /** 评论图片可能是逗号分隔的多张 */
 const splitPictures = (picture: string) => {
   return picture ? picture.split(',').filter(Boolean) : []
@@ -822,25 +902,6 @@ onMounted(() => {
   color: #1d1d1f;
 }
 
-.seller-card__meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.43;
-  letter-spacing: -0.224px;
-  color: #7a7a7a;
-}
-
-.seller-card__separator {
-  display: inline-block;
-  width: 1px;
-  height: 12px;
-  background: #e0e0e0;
-}
-
 /* ==================== 图片展示 ==================== */
 
 .gallery {
@@ -889,16 +950,23 @@ onMounted(() => {
   text-decoration: line-through;
 }
 
-.product-detail__condition {
-  display: inline-block;
+.product-detail__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 24px;
+}
+
+.product-detail__specs {
+  display: inline-block;
   padding: 6px 14px;
   font-size: 14px;
   font-weight: 600;
   line-height: 1.29;
   letter-spacing: -0.224px;
-  color: #1d1d1f;
-  background: #f5f5f7;
+  color: #0066cc;
+  background: rgba(0, 102, 204, 0.08);
   border-radius: 11px;
 }
 
@@ -1001,6 +1069,31 @@ onMounted(() => {
 
 .btn-buy:active {
   transform: scale(0.95);
+}
+
+.product-detail__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 举报商品 — 文字按钮 */
+.btn-report {
+  padding: 4px 0;
+  font-family:
+    'SF Pro Text',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 13px;
+  color: #7a7a7a;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.btn-report:hover {
+  color: #ff3b30;
 }
 
 /* ==================== 图片预览模态框 ==================== */
@@ -1284,7 +1377,8 @@ onMounted(() => {
 }
 
 .comment-card__view-replies,
-.comment-card__reply {
+.comment-card__reply,
+.comment-card__report {
   display: inline-flex;
   align-items: center;
   height: 30px;
@@ -1317,6 +1411,16 @@ onMounted(() => {
 }
 
 .comment-card__reply:hover {
+  background: #ececee;
+}
+
+.comment-card__report {
+  color: #7a7a7a;
+  background: #ffffff;
+}
+
+.comment-card__report:hover {
+  color: #ff3b30;
   background: #ececee;
 }
 

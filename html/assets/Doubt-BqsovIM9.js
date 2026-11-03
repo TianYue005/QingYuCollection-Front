@@ -1,1 +1,0 @@
-var e=`/Doubt.svg`;export{e as t};

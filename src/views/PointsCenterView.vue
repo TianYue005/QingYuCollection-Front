@@ -45,7 +45,7 @@
                     <button
                         class="wheel-button"
                         type="button"
-                        :disabled="spinning || !statusLoaded || !canDraw"
+                        :disabled="spinning || drawCompleted || !statusLoaded || !canDraw"
                         @click="spin"
                     >
                         {{ buttonText }}
@@ -88,6 +88,8 @@ const STOP_TURNS = 3
 const STOP_DURATION = 2200
 /** 最短旋转时长（毫秒），避免接口秒回时转盘刚转就停 */
 const MIN_SPIN_TIME = 1200
+/** 抽奖结果提示展示后，延迟多久再切换为「今天已抽奖」状态（毫秒） */
+const STATUS_SYNC_DELAY = 5000
 
 const prizes = ref<WheelPrize[]>([])
 const rotation = ref(0)
@@ -99,6 +101,8 @@ const balance = ref<number | null>(null)
 const canDraw = ref(true)
 /** 状态接口是否已返回，未返回前禁用抽奖按钮，避免重复抽奖 */
 const statusLoaded = ref(false)
+/** 本次抽奖是否已完成（结果提示已展示，但状态文案延迟切换） */
+const drawCompleted = ref(false)
 /** 后端返回的状态提示文案，如「今天已经抽过奖了~」 */
 const statusText = ref('')
 
@@ -142,6 +146,8 @@ let stopTo = 0
 let stopStartAt = 0
 let pendingIndex = 0
 let pendingText = ''
+let pendingStatusText = ''
+let statusTimer = 0
 
 function tick(now: number) {
     const elapsed = Math.min((now - lastFrame) / 1000, 0.1)
@@ -166,11 +172,17 @@ function tick(now: number) {
         mode = 'idle'
         spinning.value = false
         result.value = pendingText
+        // 结果提示展示后延迟 5 秒，再切换为「今天已经抽过奖了」
+        window.clearTimeout(statusTimer)
+        statusTimer = window.setTimeout(() => {
+            canDraw.value = false
+            statusText.value = pendingStatusText || '今天已经抽过奖了~'
+        }, STATUS_SYNC_DELAY)
     }
 }
 
 async function spin() {
-    if (spinning.value || !canDraw.value || !prizes.value.length) return
+    if (spinning.value || drawCompleted.value || !canDraw.value || !prizes.value.length) return
 
     spinning.value = true
     result.value = ''
@@ -184,9 +196,9 @@ async function spin() {
         // 结果由后端决定，返回前转盘持续旋转
         const drawResult = await drawWheel()
 
-        // 抽奖成功后当天不能再抽，并同步累加积分余额
-        canDraw.value = false
-        statusText.value = drawResult.text || '今天已经抽过奖了~'
+        // 抽奖成功后当天不能再抽，但状态文案等转盘停稳、结果提示展示后再延迟切换
+        drawCompleted.value = true
+        pendingStatusText = drawResult.text || '今天已经抽过奖了~'
         const wonPoints = Number(drawResult.points) || 0
         if (balance.value !== null) balance.value += wonPoints
 
@@ -263,7 +275,10 @@ onMounted(async () => {
     await loadStatus()
 })
 
-onBeforeUnmount(() => cancelAnimationFrame(rafId))
+onBeforeUnmount(() => {
+    cancelAnimationFrame(rafId)
+    window.clearTimeout(statusTimer)
+})
 </script>
 
 <style scoped>

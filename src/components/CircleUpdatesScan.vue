@@ -123,15 +123,30 @@
                     <span class="like-count">{{ likeCount }}</span>
                 </button>
             </div>
+
+            <!-- 举报当前内容 -->
+            <div class="report-bar">
+                <button class="btn-report" @click="openDetailReport">举报</button>
+            </div>
         </div>
 
         <!-- 评论区 -->
         <div v-if="detail" class="comment-section">
             <h2 class="comment-heading">评论</h2>
             <div class="comment-wrap">
-                <CircleComment :circle-id="detail.id" />
+                <CircleComment :circle-id="detail.id" :comment-report-type="commentReportType" />
             </div>
         </div>
+
+        <!-- 举报弹窗 -->
+        <ReportDialog
+            v-model:visible="reportVisible"
+            :label="reportTarget.label"
+            :report-type="reportTarget.type"
+            :report-id="reportTarget.reportId"
+            :object-id="reportTarget.objectId"
+            :report="reportTarget.report"
+        />
     </div>
 </template>
 
@@ -143,6 +158,7 @@ import { acceptTask, detailedCircleUpdates, getActivityStatus, joinActivity, lik
 import type { Circle } from '@/api/forum'
 import { getUserId } from '@/composables/useAuth'
 import CircleComment from '@/components/CircleComment.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -296,6 +312,59 @@ const badgeText = computed(() => {
     if (!detail.value) return ''
     return option.value === 'Activity' ? statusText.value : detail.value.type
 })
+
+/* ---- 举报 ---- */
+
+/** 各模块的举报类型：内容举报 / 评论举报 */
+const reportTypeMap: Record<string, { detail: number; comment: number }> = {
+    Dynamic: { detail: 4, comment: 5 },
+    Task: { detail: 6, comment: 7 },
+    Activity: { detail: 8, comment: 9 },
+}
+
+/** 当前内容（圈子动态/跑腿任务/热门活动）的举报类型 */
+const detailReportType = computed(
+    () => (reportTypeMap[option.value] ?? { detail: 4, comment: 5 }).detail,
+)
+
+/** 当前评论的举报类型，传给 CircleComment 用于逐条评论举报 */
+const commentReportType = computed(
+    () => (reportTypeMap[option.value] ?? { detail: 4, comment: 5 }).comment,
+)
+
+/** 举报对象的内容：动态取正文，任务取任务要求，活动取标题 */
+const detailReportContent = computed(() => {
+    if (!detail.value) return ''
+    if (option.value === 'Dynamic') return detail.value.content || ''
+    if (option.value === 'Task') return detail.value.requestContent || ''
+    return detail.value.title || ''
+})
+
+const reportVisible = ref(false)
+const reportTarget = ref({
+    label: '',
+    type: 4,
+    reportId: id,
+    objectId: id,
+    report: '',
+})
+
+/** 举报当前详情内容：reportId / objectId 均为圈子动态 id */
+const openDetailReport = () => {
+    const nameMap: Record<string, string> = {
+        Dynamic: '圈子动态',
+        Task: '跑腿任务',
+        Activity: '热门活动',
+    }
+    reportTarget.value = {
+        label: `${nameMap[option.value] || '内容'}：${detailReportContent.value || id}`,
+        type: detailReportType.value,
+        reportId: id,
+        objectId: id,
+        report: detailReportContent.value,
+    }
+    reportVisible.value = true
+}
 
 /** 将后端时间（可能是 2026-08-14T01:38:40）格式化为易读的 yyyy-MM-dd HH:mm */
 const formatTime = (time?: string) => {
@@ -646,6 +715,30 @@ onMounted(fetchDetail)
     width: 18px;
     height: 18px;
     flex-shrink: 0;
+}
+
+/* ---------- 举报 ---------- */
+.report-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.btn-report {
+    padding: 4px 0;
+    font-family: "SF Pro Text", system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: #7a7a7a;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    outline: none;
+    transition: color 0.2s ease;
+}
+
+.btn-report:hover {
+    color: #ff3b30;
 }
 
 /* ---------- 评论区 ---------- */

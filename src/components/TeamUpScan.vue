@@ -64,6 +64,11 @@
                     {{ detail.joined > 0 ? '已经参与' : (joining ? '参加中...' : '参加组团') }}
                 </button>
             </div>
+
+            <!-- 举报组团 -->
+            <div class="report-bar">
+                <button class="btn-report" @click="openTeamUpReport">举报</button>
+            </div>
         </div>
 
         <!-- 评论区 -->
@@ -150,6 +155,9 @@
                         <button class="comment-reply-btn" @click="openReply(c)">
                             回复
                         </button>
+                        <button class="comment-reply-btn" @click="openCommentReport(c)">
+                            举报
+                        </button>
                     </div>
                 </div>
             </div>
@@ -226,6 +234,15 @@
                 </div>
             </Transition>
         </Teleport>
+        <!-- 举报弹窗 -->
+        <ReportDialog
+            v-model:visible="reportVisible"
+            :label="reportTarget.label"
+            :report-type="reportTarget.type"
+            :report-id="reportTarget.reportId"
+            :object-id="reportTarget.objectId"
+            :report="reportTarget.report"
+        />
     </div>
 </template>
 
@@ -237,6 +254,7 @@ import type { TeamUp, CommentVO } from '@/api/forum.ts'
 import { getUserId } from '@/composables/useAuth'
 import { resolveAvatar } from '@/utils/avatar'
 import { toast } from '@/utils/message'
+import ReportDialog from '@/components/ReportDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -476,6 +494,51 @@ const openConversation = async (comment: CommentVO) => {
 
 const closeConversation = () => {
     showConversation.value = false
+}
+
+/* ==================== 举报 ==================== */
+/** 组团举报 type = 2，组团发言举报 type = 3 */
+const REPORT_TYPE_TEAMUP = 2
+const REPORT_TYPE_TEAMUP_COMMENT = 3
+
+const reportVisible = ref(false)
+type ReportTarget = {
+    label: string
+    type: number
+    reportId: number | string
+    objectId: number | string
+    report: string
+}
+const reportTarget = ref<ReportTarget>({
+    label: '',
+    type: REPORT_TYPE_TEAMUP,
+    reportId: id,
+    objectId: id,
+    report: '',
+})
+
+/** 举报组团：reportId / objectId 均为组团 id */
+const openTeamUpReport = () => {
+    reportTarget.value = {
+        label: `组团：${detail.value?.title || id}`,
+        type: REPORT_TYPE_TEAMUP,
+        reportId: id,
+        objectId: id,
+        report: detail.value?.title || '',
+    }
+    reportVisible.value = true
+}
+
+/** 举报组团下的发言：reportId 为评论 id，objectId 为组团 id */
+const openCommentReport = (comment: CommentVO) => {
+    reportTarget.value = {
+        label: `评论：${comment.text || comment.id}`,
+        type: REPORT_TYPE_TEAMUP_COMMENT,
+        reportId: comment.id,
+        objectId: id,
+        report: comment.text || '',
+    }
+    reportVisible.value = true
 }
 
 /** 评论图片可能是逗号分隔的多张 */
@@ -742,6 +805,30 @@ onMounted(() => {
 .btn-join--joined {
     color: #86868b;
     background: #f5f5f7;
+}
+
+/* ---------- 举报 ---------- */
+.report-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.btn-report {
+    padding: 4px 0;
+    font-family: "SF Pro Text", system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: #7a7a7a;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    outline: none;
+    transition: color 0.2s ease;
+}
+
+.btn-report:hover {
+    color: #ff3b30;
 }
 
 /* ---------- 评论区 ---------- */

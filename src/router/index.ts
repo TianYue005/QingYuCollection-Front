@@ -13,6 +13,18 @@ const router = createRouter({
       redirect: { name: 'campusMarket' },
     },
     {
+      //管理员登录
+      path: '/admin/login',
+      name: 'adminLogin',
+      component: () => import('@/views/AdminView.vue'),
+    },
+    {
+      //管理员后台 - 举报处理
+      path: '/admin/manage',
+      name: 'adminManage',
+      component: () => import('@/views/AdminManageView.vue'),
+    },
+    {
       //登录
       path: '/user/login',
       name: 'login',

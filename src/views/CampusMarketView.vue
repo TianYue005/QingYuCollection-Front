@@ -16,8 +16,9 @@
         </span>
       </div>
 
-      <!-- 手风琴轮播图 -->
+      <!-- 手风琴轮播图（无推荐数据时不展示） -->
       <div
+        v-if="accordionItems.length"
         class="accordion-carousel"
         @mouseenter="stopBannerTimer"
         @mouseleave="startBannerTimer"
@@ -92,7 +93,7 @@
             <span class="price-nickname">
               <span class="product-price">{{ item.price }}</span
               ><!-- 商品价格 -->
-              <span class="product-original-price">{{ item.originalPrice }}</span
+              <span v-if="item.originalPrice" class="product-original-price">{{ item.originalPrice }}</span
               ><!-- 原始价格 -->
             </span>
           </div>
@@ -133,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Close } from '@element-plus/icons-vue'
 import { getItemsToPage, searchItemsByKeyword, getRecommendItems, type GoodsVO } from '@/api/item'
@@ -161,17 +162,10 @@ interface AccordionItem {
   goodsId?: string
 }
 
-/** 无数据时的占位面板（至少展示一个） */
-const PLACEHOLDER_TEXT = '------'
-function createPlaceholderItem(): AccordionItem {
-  return {
-    image: '',
-    title: PLACEHOLDER_TEXT,
-    subtitle: PLACEHOLDER_TEXT,
-  }
-}
+/** 推荐商品字段为空时的兜底文案 */
+const FALLBACK_TEXT = '------'
 
-const accordionItems = ref<AccordionItem[]>([createPlaceholderItem()])
+const accordionItems = ref<AccordionItem[]>([])
 const activeBanner = ref(0)
 let bannerTimer: number | null = null
 const BANNER_INTERVAL = 4000
@@ -186,7 +180,7 @@ function handleAccordionClick(index: number) {
 /** 将推荐商品转为手风琴面板 */
 function mapGoodsToAccordion(goods: GoodsVO): AccordionItem {
   const firstImg = goods.imgList?.[0]
-  const firstTag = goods.tags?.split(',')[0]?.trim()
+  const firstTag = goods.tag?.[0]?.trim()
   const desc = goods.goodsDesc?.trim() || ''
   const shortDesc = desc.length > 8 ? `${desc.slice(0, 8)}…` : desc
   const price = goods.price == null ? '' : `¥${Number(goods.price).toFixed(2)}`
@@ -194,13 +188,13 @@ function mapGoodsToAccordion(goods: GoodsVO): AccordionItem {
     goods.originalPrice == null ? '' : `原价 ¥${Number(goods.originalPrice).toFixed(2)}`
   return {
     image: firstImg?.imgUrl || goods.imgUrl || '',
-    title: firstTag || shortDesc || PLACEHOLDER_TEXT,
-    subtitle: price ? [price, originalPrice].filter(Boolean).join(' · ') : PLACEHOLDER_TEXT,
+    title: firstTag || shortDesc || FALLBACK_TEXT,
+    subtitle: price ? [price, originalPrice].filter(Boolean).join(' · ') : FALLBACK_TEXT,
     goodsId: goods.goodsId,
   }
 }
 
-/** 获取商品推荐，失败或无数据时保留灰色占位面板 */
+/** 获取商品推荐，失败或无数据时不展示手风琴面板 */
 async function loadRecommend() {
   try {
     const res = await getRecommendItems()
@@ -209,6 +203,7 @@ async function loadRecommend() {
     if (items.length === 0) return
     accordionItems.value = items.slice(0, 5)
     activeBanner.value = 0
+    startBannerTimer()
   } catch {
     console.error('获取商品推荐失败')
   }
@@ -216,6 +211,7 @@ async function loadRecommend() {
 
 function startBannerTimer() {
   stopBannerTimer()
+  if (!accordionItems.value.length) return
   bannerTimer = window.setInterval(() => {
     activeBanner.value = (activeBanner.value + 1) % accordionItems.value.length
   }, BANNER_INTERVAL)
@@ -228,9 +224,13 @@ function stopBannerTimer() {
   }
 }
 
-/** 分类标签（暂未接入筛选逻辑） */
+/** 分类标签：切换时把按钮文字作为 specs 传给分页接口 */
 const categories = ['全部', '电子产品', '饰品', '家居']
 const activeCategory = ref(0)
+/** 当前分类对应的查询参数：选择「全部」时不传 specs */
+const specsParam = computed(() =>
+  activeCategory.value > 0 ? categories[activeCategory.value] : undefined,
+)
 const tabRefs: HTMLElement[] = []
 const indicatorStyle = ref({ width: '0px', transform: 'translateX(0px)' })
 const indicatorReady = ref(false)
@@ -254,6 +254,11 @@ function handleCategoryClick(index: number) {
   activeCategory.value = index
   // 等待字体粗细等样式更新后再测量，保证条纹落在正确位置
   nextTick(updateIndicator)
+  // 分类切换后重新从第一页拉取
+  page.value = 1
+  productList.value = []
+  hasMore.value = true
+  fetchPage()
 }
 
 function handleResize() {
@@ -292,7 +297,7 @@ function mapGoodsToProduct(goods: GoodsVO): ProductItem {
     sellerProfilePicture: DEFAULT_AVATAR,
     sellerNickname: goods.userName || '匿名用户',
     sellerId: goods.userId ?? '',
-    originalPrice: `¥${(goods.originalPrice ?? 0).toFixed(2)}`,
+    originalPrice: goods.originalPrice ? `¥${goods.originalPrice.toFixed(2)}` : '',
     creditScore: goods.credit ?? null,
     itemId: goods.goodsId,
   }
@@ -306,20 +311,32 @@ function creditScoreClass(credit: number | null) {
   return ''
 }
 
+/** 请求序号：只有最新一次请求的结果才允许写入列表，避免切换分类时旧数据窜页 */
+let requestSeq = 0
+
 async function fetchPage(isLoadMore = false) {
-  if (loading.value) return
+  // 加载更多不能并发；切换分类/搜索则允许抢占进行中的请求
+  if (loading.value && isLoadMore) return
+  const reqId = ++requestSeq
+  const requestPage = page.value
+  const keyword = searchText.value.trim()
+  const useSearch = searchMode.value
+  const specs = specsParam.value
   loading.value = true
   try {
-    const res = searchMode.value
+    const res = useSearch
       ? await searchItemsByKeyword({
-          keyword: searchText.value.trim(),
-          pageNumber: page.value,
+          keyword,
+          pageNumber: requestPage,
           pageSize,
         })
       : await getItemsToPage({
-          pageNumber: page.value,
+          pageNumber: requestPage,
           pageSize,
+          ...(specs ? { specs } : {}),
         })
+    // 期间已发起更新的请求，本次结果直接丢弃
+    if (reqId !== requestSeq) return
     if (res.code === 1 && res.data) {
       const { total: t, rows } = res.data
       total.value = t
@@ -333,9 +350,10 @@ async function fetchPage(isLoadMore = false) {
       hasMore.value = productList.value.length < t
     }
   } catch {
-    console.error('获取商品列表失败')
+    if (reqId === requestSeq) console.error('获取商品列表失败')
   } finally {
-    loading.value = false
+    // 只在本次请求仍是最新请求时结束 loading，避免旧请求提前解除新请求的加载态
+    if (reqId === requestSeq) loading.value = false
   }
 }
 

@@ -5,8 +5,8 @@ import FloatingButtons from '@/components/FloatingButtons.vue'
 
 const route = useRoute()
 
-// 登录、注册页不显示悬浮按钮
-const hiddenRouteNames = ['login', 'register']
+// 登录、注册页、管理后台不显示悬浮按钮
+const hiddenRouteNames = ['login', 'register', 'adminLogin', 'adminManage']
 const showFloatingButtons = computed(() => !hiddenRouteNames.includes(route.name as string))
 </script>
 

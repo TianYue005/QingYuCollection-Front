@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { login, getUserInfo } from '@/api/user'
-import { setUserInfo, getUserId } from '@/composables/useAuth'
+import { saveTokens, setUserInfo, getUserId } from '@/composables/useAuth'
 import { toast } from '@/utils/message'
 
 const router = useRouter()
@@ -11,6 +11,8 @@ const account = ref('')
 const password = ref('')
 const rememberMe = ref(false)
 const isLoading = ref(false)
+/** “登 录”按钮累计点击次数：达到 5 次进入管理员登录页 */
+const loginClicks = ref(0)
 
 onMounted(() => {
   const savedAccount = localStorage.getItem('rememberedAccount')
@@ -21,6 +23,13 @@ onMounted(() => {
 })
 
 const handleLogin = async () => {
+  // 连续点击“登 录”5 次时跳转管理员登录页
+  loginClicks.value++
+  if (loginClicks.value >= 5) {
+    loginClicks.value = 0
+    router.push({ name: 'adminLogin' })
+    return
+  }
   if (!account.value || !password.value) return
   isLoading.value = true
   try {
@@ -29,9 +38,16 @@ const handleLogin = async () => {
       toast.error(result.msg || '登录失败，请检查账号和密码')
       return
     }
-    const token = result.data as string
+    // 登录返回长期 token + 短期 token：短期用于业务请求，长期用于换取新的短期 token
+    const tokenVO = result.data
+    const shortToken = tokenVO?.shortToken
+    const longToken = tokenVO?.longToken || tokenVO?.LongToken || ''
+    if (!shortToken) {
+      toast.error(tokenVO?.message || '登录失败，请检查账号和密码')
+      return
+    }
+    saveTokens(shortToken, longToken, rememberMe.value)
     const storage = rememberMe.value ? localStorage : sessionStorage
-    storage.setItem('token', token)
 
     const userId = getUserId()
     if (userId) {

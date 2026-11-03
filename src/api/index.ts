@@ -11,11 +11,12 @@
  * - JSONbig：解决 JavaScript 原生 Number 精度不足的问题（最大安全整数 2^53-1）。
  *   当后端返回大整数（如雪花 ID、金额分）时，转为字符串存储，避免精度丢失。
  */
-import axios from 'axios'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
 // @ 是项目配置的路径别名，指向 src 目录
 import router from '@/router'
 // json-bigint：处理大整数精度问题（如 Java 后端返回的 Long 类型雪花 ID）
 import JSONbig from 'json-bigint'
+import { clearTokens, getLongToken, getShortToken, saveShortToken } from '@/composables/useAuth'
 
 /**
  * 创建一个 JSONbig 解析器实例
@@ -61,17 +62,34 @@ const api = axios.create({
   ],
 })
 
+/**
+ * 不需要携带短期 token 的接口：登录、注册
+ * 其余接口一律使用短期 token
+ */
+const AUTH_FREE_URLS = ['/user/login', '/user/register']
+
+/** 用长期 token 换取新的短期 token 的接口 */
+const REFRESH_TOKEN_URL = '/user/LongTime2ShortTerm'
+
+function isAuthFree(url?: string): boolean {
+  return !!url && AUTH_FREE_URLS.some((path) => url.includes(path))
+}
+
+/** 携带重试标记的请求配置，避免 401 后无限重试 */
+type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean }
+
 // ============================================================
 // 请求拦截器（Request Interceptor）
 // ============================================================
-// 拦截器的作用：在请求发送前 "拦截" 下来，做一些预处理
-// 这里主要做一件事：自动从 localStorage 或 sessionStorage 中取 Token，
-// 并添加到请求头的 Authorization 字段中（Bearer 认证方式）
+// 在请求发送前自动携带短期 token（登录、注册除外）
 api.interceptors.request.use(
   // 第一个参数：成功回调 —— 修改完 config 后必须 return，请求才会继续发出
   function (config) {
-    // 优先从 localStorage取；其次从 sessionStorage取
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    if (isAuthFree(config.url)) {
+      return config
+    }
+    // 只使用短期 token，长期 token 不参与业务请求
+    const token = getShortToken()
     if (token) {
       // Bearer Token 是一种标准的认证方式："Bearer " + token
       config.headers.Authorization = `Bearer ${token}`
@@ -85,39 +103,95 @@ api.interceptors.request.use(
 )
 
 /**
- * 统一处理 401 未授权状态
- * 触发场景：
- *   1. 用户未登录
- *   2. Token 已过期
- *   3. Token 无效
- *
- * 处理逻辑：
- *   清除本地存储的 Token，并跳转到登录页（避免重复跳转）
+ * 用长期 token 换取新的短期 token。
+ * 这里直接用未封装的 axios，避免再次进入拦截器造成递归。
+ */
+async function requestNewShortToken(): Promise<string> {
+  const longToken = getLongToken()
+  if (!longToken) {
+    throw new Error('缺少长期 token，无法续期')
+  }
+  const response = await axios.get<{ code?: number; msg?: string; data?: string }>(
+    `/api${REFRESH_TOKEN_URL}`,
+    { params: { token: longToken }, timeout: 10000 },
+  )
+  const body = response.data
+  const newToken = body?.data
+  if (body?.code !== 1 || !newToken) {
+    throw new Error(body?.msg || '换取短期 token 失败')
+  }
+  saveShortToken(newToken)
+  return newToken
+}
+
+/** 并发出现多个 401 时只发起一次续期请求，其余请求复用同一个 Promise */
+let refreshing: Promise<string> | null = null
+
+function refreshShortToken(): Promise<string> {
+  if (!refreshing) {
+    refreshing = requestNewShortToken().finally(() => {
+      refreshing = null
+    })
+  }
+  return refreshing
+}
+
+/** 用新的短期 token 重放原请求；已重试过或没有长期 token 时直接失败 */
+async function retryWithNewShortToken(config: RetriableConfig) {
+  if (config._retried || !getLongToken()) {
+    throw new Error('无法刷新登录状态')
+  }
+  const token = await refreshShortToken()
+  config._retried = true
+  config.headers.Authorization = `Bearer ${token}`
+  return api(config)
+}
+
+/**
+ * 统一处理登录失效（无法用长期 token 换到新的短期 token）
+ * 处理逻辑：清除本地 token，并跳转到登录页（避免重复跳转）
+ * 管理员页面（/admin/**）失效时回到管理员登录页，其余回到用户登录页
  */
 function handleUnauthorized() {
-  // 清除两个可能存储 Token 的位置
-  localStorage.removeItem('token')
-  sessionStorage.removeItem('token')
-  // 防止死循环：如果当前已经在登录页，就不再跳转
-  if (router.currentRoute.value.name !== 'login') {
-    router.push({ name: 'login' })
+  clearTokens()
+  const current = router.currentRoute.value
+  const isAdminPage = current.path.startsWith('/admin')
+  const targetName = isAdminPage ? 'adminLogin' : 'login'
+  // 防止死循环：如果当前已经在对应登录页，就不再跳转
+  if (current.name !== targetName) {
+    router.push({ name: targetName })
+  }
+}
+
+/** 供非 axios 请求（如 AI 客服的 fetch 流）复用：续期失败则退出登录 */
+export async function refreshShortTokenOrLogout(): Promise<string> {
+  try {
+    return await refreshShortToken()
+  } catch (error) {
+    handleUnauthorized()
+    throw error
   }
 }
 
 // ============================================================
 // 响应拦截器（Response Interceptor）
 // ============================================================
-// 拦截器的作用：在响应回来但还没交给调用方之前 "拦截" 下来，做统一处理
-// 这里做两件事：
-//   1. 成功响应：检查业务状态码，401 时跳转登录
-//   2. 失败响应：检查 HTTP 状态码，401 时跳转登录
+// 处理逻辑：
+//   1. 收到 401 时，先用长期 token 换取新的短期 token，成功则重放原请求
+//   2. 换不到新 token 或重放后仍然 401，则清除登录态并跳转登录页
 api.interceptors.response.use(
   // 第一个参数：成功回调（HTTP 状态码 2xx）
-  // 这里仍然需要检查业务层面的 code，因为有些后端在 HTTP 200 的响应体里
-  // 用 code: 401 来表示"未授权"
-  function (response) {
-    // 后端业务层返回的 code 为 401 时，视为未授权
+  // 有些后端会在 HTTP 200 的响应体里用 code: 401 表示"未授权"
+  async function (response) {
     if (response.data?.code === 401) {
+      const config = response.config as RetriableConfig
+      if (!isAuthFree(config?.url)) {
+        try {
+          return await retryWithNewShortToken(config)
+        } catch {
+          // 换不到新的短期 token，走下面的退出登录
+        }
+      }
       handleUnauthorized()
       return Promise.reject(new Error('未登录或登录已过期'))
     }
@@ -125,13 +199,22 @@ api.interceptors.response.use(
     return response.data
   },
   // 第二个参数：失败回调（HTTP 状态码非 2xx，如 400、401、500 等）
-  function (error) {
-    const status = error.response?.status  // HTTP 状态码
+  async function (error) {
+    const status = error.response?.status // HTTP 状态码
     // 优先取后端返回的错误消息，其次取 Axios 的错误消息，最后给一个默认值
-    const message = error.response?.data?.message || error.message || '请求失败'
+    const message =
+      error.response?.data?.msg || error.response?.data?.message || error.message || '请求失败'
     console.error('[API Error]', message)
 
-    // HTTP 状态码 401（与业务层 401 呼应，双重保险）
+    const config = error.config as RetriableConfig | undefined
+    // HTTP 401：先用长期 token 续期并重放请求
+    if (status === 401 && config && !isAuthFree(config.url)) {
+      try {
+        return await retryWithNewShortToken(config)
+      } catch {
+        // 续期或重放失败，走下面的退出登录
+      }
+    }
     if (status === 401) {
       handleUnauthorized()
     }

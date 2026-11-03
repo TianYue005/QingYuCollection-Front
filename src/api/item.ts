@@ -18,13 +18,13 @@ export interface UploadItemDTO {
   /** 原价 */
   originalPrice: number
   /** 规格属性：电子产品、饰品这一类的标签 */
-  specs: string[]
+  specs: string
   /** 标签：99新、急出这一类的标签 */
   tag: string[]
   /** 用户 id，后端提供 */
   userId?: number
-  /** 标签的整数化存储形式，后端生成 */
-  IntTag?: number
+  /** 标签的整数化存储形式（按标签在固定列表中的位置做位图） */
+  IntTag: number
   /** 商品 id，后端提供 */
   goodsId?: number
 }
@@ -51,7 +51,7 @@ export interface GoodsImage {
   imgHeight: number
 }
 
-/** 分页商品 VO（含图片集合） */
+/** 商品 VO（与后端 GoodsVO 对齐，GoodsVO 继承 Goods） */
 export interface GoodsVO {
   goodsId: string
   userId: number
@@ -59,14 +59,27 @@ export interface GoodsVO {
   goodsDesc: string
   price: number
   originalPrice: number
-  tags: string
+  /** 商品标签，如 99新、急出 */
+  tag: string[]
+  /** 规格属性，如 电子产品、饰品 */
+  specs: string
+  createTime: string
+  updateTime: string
+  /** 逻辑删除：0 未删，1 已删 */
+  isDeleted: number
+  imgList: GoodsImage[]
+  /** 0 说明没有卖出，非 0 则卖给了该用户 id */
+  sold: number
+  /** 交易是否完成（null 未完成） */
+  finished: number | null
   /** 当前用户是否已收藏 */
   favourite: boolean
-  imgList: GoodsImage[]
-  /** 简易图片展示：首图平铺字段（部分接口直接返回） */
+  /** 简易图片展示：首图平铺字段 */
   imgUrl?: string
   imgWidth?: number
   imgHeight?: number
+  /** 是否有评价：1 为有，0 为无 */
+  hasEvaluate?: number
   /** 卖家信誉积分 */
   credit?: number
 }
@@ -107,6 +120,8 @@ export interface ItemQueryParam {
   pageNumber?: number
   pageSize?: number
   sortRules?: string
+  /** 分类：如 电子产品、饰品，不传表示全部 */
+  specs?: string
 }
 
 /** 关键词搜索参数 */
@@ -131,6 +146,14 @@ export const uploadImages = (files: File[]) => {
 /** 商品上架 */
 export const addItem = (data: UploadItemDTO) => {
   return api.post<any, Result<string>>('/items/add', data)
+}
+
+/**
+ * 更新已有商品的价格（复用 /items/add 接口）
+ * 后端约定：同时传递 goodsId 与 price 时视为更新现有商品信息
+ */
+export const updateItemPrice = (goodsId: string | number, price: number) => {
+  return api.post<any, Result<string>>('/items/add', { goodsId, price })
 }
 
 /** 根据ID查找商品 */
@@ -173,6 +196,19 @@ export const getRecommendItems = () => {
 /** 查询当前用户发布的商品 */
 export const getMyItems = () => {
   return api.get<any, Result<PageResult<GoodsVO>>>('/items/myItems')
+}
+
+/** 删除自己的商品（后端只允许删除不在交易状态的商品） */
+export const deleteItem = (itemId: string | number) => {
+  return api.post<any, Result<Object>>(`/items/delete/item/${itemId}`)
+}
+
+/**
+ * 为自己的商品购买推荐位（POST /items/recommend/RecommendedSpot/{goodsId}）
+ * 后端会把商品写入 Redis 推荐位，位置有限，满位时返回错误信息
+ */
+export const recommendItem = (goodsId: string | number) => {
+  return api.post<any, Result<string>>(`/items/recommend/RecommendedSpot/${goodsId}`)
 }
 
 /**
@@ -239,6 +275,31 @@ export const selectItemComment = (goodsId: number) => {
 /** 查看某条商品评论之前的所有互动（@PathVariable 评论 id） */
 export const selectItemCommentInteraction = (commentId: number) => {
   return api.get<any, Result<PageResult<CommentGoodsVO>>>(`/items/select/comment/item/${commentId}`)
+}
+
+/**
+ * 举报（与后端 ReportDTO 对齐）
+ * - 商品详情页的评论举报：type = 0，objectId 传商品 id
+ * - 商品举报：type = 1，objectId 传商品 id
+ */
+export interface ReportDTO {
+  /** 举报对象的内容 */
+  report: string
+  /** 举报对象的 id（商品 id / 评论 id） */
+  reportId: number | string
+  /** 所在对象的 id（具体的商品详细界面 id / 论坛 id） */
+  objectId: number | string
+  /** 所在对象类型：0 商品详情页的评论举报，1 商品举报，2 组团举报，3 组团发言举报，
+   * 4 圈子动态举报，5 圈子动态评论举报，6 跑腿任务举报，7 跑腿任务评论举报，
+   * 8 热门活动举报，9 热门活动评论举报 */
+  type: number
+  /** 举报原因 */
+  reason: string
+}
+
+/** 提交举报 */
+export const reportComment = (data: ReportDTO) => {
+  return api.post<any, Result<Object>>('/items/reportComment', data)
 }
 
 /**

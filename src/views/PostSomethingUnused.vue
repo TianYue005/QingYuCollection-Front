@@ -188,6 +188,8 @@ const moreTags = [
   '急用钱',
   '礼盒装',
 ]
+// 标签全量列表，用于生成 IntTag 位图（位置即二进制位）
+const allTags = [...presetTags, ...moreTags]
 const moreTagsExpanded = ref(false)
 
 const form = reactive({
@@ -291,6 +293,14 @@ function toggleMoreTags() {
   moreTagsExpanded.value = !moreTagsExpanded.value
 }
 
+// 根据已选标签生成整数标签（位图：标签在 allTags 中的下标对应二进制位）
+function buildIntTag(tags: string[]) {
+  return tags.reduce((mask, tag) => {
+    const index = allTags.indexOf(tag)
+    return index > -1 ? mask | (1 << index) : mask
+  }, 0)
+}
+
 function validateNumber(field: 'price' | 'originalPrice', e: Event) {
   const target = e.target as HTMLInputElement
   const val = target.value.replace(/[^\d.]/g, '')
@@ -337,14 +347,16 @@ async function handleSubmit() {
       description: form.description.trim(),
       price: Number(form.price),
       originalPrice: Number(form.originalPrice) || 0,
-      // 规格属性：分类标签（电子产品、饰品等）
-      specs: [form.category],
+      // 规格属性：单个分类标签（电子产品、饰品等）
+      specs: form.category,
       // 标签：属性标签（99新、急出等）
       tag: form.attributes,
+      // 标签的整数化存储形式
+      IntTag: buildIntTag(form.attributes),
     })
 
     if (addRes.code === 1) {
-      toast.success(addRes.msg || '发布成功')
+      toast.success('发布成功')
       resetForm()
     } else {
       toast.error(addRes.msg || '商品上架失败')
